@@ -19,13 +19,13 @@ export class SecretNotFoundError extends Error {
   readonly key: SecretKey;
 
   constructor(key: SecretKey) {
-    super(`Secret ${key} not found. Run: npx gitflow-ai auth`);
+    super(`Secret ${key} not found. Run: npx GitFlow auth`);
     this.name = 'SecretNotFoundError';
     this.key = key;
   }
 }
 
-const SERVICE_NAME = 'gitflow-ai';
+const SERVICE_NAME = 'GitFlow';
 
 const secretKeySchema = z.enum([
   'ANTHROPIC_API_KEY',
