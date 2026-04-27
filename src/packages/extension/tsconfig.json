@@ -14,5 +14,5 @@
     "types": ["node", "vscode"]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "out", "**/*.spec.ts", "**/*.spec.md"]
+  "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.spec.md"]
 }
