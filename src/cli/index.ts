@@ -1,5 +1,6 @@
+#!/usr/bin/env node
 import { execFile } from 'node:child_process';
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -727,9 +728,10 @@ export async function main(argv: string[]): Promise<void> {
 
 const invokedDirectly = (() => {
   try {
+    const argvPath = process.argv[1];
+    if (argvPath === undefined) return false;
     return (
-      process.argv[1] !== undefined &&
-      fileURLToPath(import.meta.url) === process.argv[1]
+      realpathSync(fileURLToPath(import.meta.url)) === realpathSync(argvPath)
     );
   } catch {
     return false;

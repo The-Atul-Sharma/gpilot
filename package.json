@@ -4,6 +4,7 @@
   },
   "type": "module",
   "name": "gitflow",
+  "version": "1.0.0",
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/minimist": "^1.2.5",
