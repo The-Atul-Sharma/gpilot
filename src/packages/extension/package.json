@@ -1,0 +1,61 @@
+{
+  "name": "gitflow-vscode",
+  "displayName": "gitflow",
+  "description": "AI-powered git workflow automation",
+  "version": "0.1.0",
+  "publisher": "gitflow",
+  "engines": {
+    "vscode": "^1.85.0",
+    "node": ">=24.0.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "scripts": {
+    "build": "tsc -p .",
+    "watch": "tsc -p . --watch"
+  },
+  "contributes": {
+    "commands": [
+      { "command": "gitflow.commit", "title": "gitflow: Generate commit message" },
+      { "command": "gitflow.createPR", "title": "gitflow: Create PR with description" },
+      { "command": "gitflow.reviewPR", "title": "gitflow: Review current PR" },
+      { "command": "gitflow.fixAllBlockers", "title": "gitflow: Fix all blocker comments" },
+      { "command": "gitflow.fixComment", "title": "gitflow: Fix selected comment" },
+      { "command": "gitflow.generateSpec", "title": "gitflow: Generate spec for active file" },
+      { "command": "gitflow.generateClaudeMd", "title": "gitflow: Generate CLAUDE.md" },
+      { "command": "gitflow.switchModel", "title": "gitflow: Switch AI model" },
+      { "command": "gitflow.auth", "title": "gitflow: Setup auth keys" },
+      { "command": "gitflow.showPanel", "title": "gitflow: Show gitflow panel" },
+      { "command": "gitflow.status", "title": "gitflow: Show status" }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gitflow",
+          "title": "gitflow",
+          "icon": "$(source-control)"
+        }
+      ]
+    },
+    "views": {
+      "gitflow": [
+        {
+          "type": "webview",
+          "id": "gitflow.panel",
+          "name": "gitflow"
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^25.6.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^6.0.3"
+  }
+}
