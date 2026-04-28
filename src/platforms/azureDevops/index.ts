@@ -1,14 +1,17 @@
-import { Buffer } from 'node:buffer';
-import { z } from 'zod';
-import type { CreatePRInput, CreatedPR } from '../../modules/prCreator/index.ts';
-import type { InlineIssue } from '../../modules/prReviewer/index.ts';
+import { Buffer } from "node:buffer";
+import { z } from "zod";
+import type {
+  CreatePRInput,
+  CreatedPR,
+} from "../../modules/prCreator/index.ts";
+import type { InlineIssue } from "../../modules/prReviewer/index.ts";
 import type {
   PRComment,
   CommentSeverity,
-} from '../../modules/commentFixer/index.ts';
-import type { GitPlatform } from '../github/index.ts';
+} from "../../modules/commentFixer/index.ts";
+import type { GitPlatform } from "../github/index.ts";
 
-export type { GitPlatform } from '../github/index.ts';
+export type { GitPlatform } from "../github/index.ts";
 
 export interface AzureDevOpsConfig {
   org: string;
@@ -22,13 +25,13 @@ export class AzureDevOpsError extends Error {
 
   constructor(message: string, status?: number) {
     super(message);
-    this.name = 'AzureDevOpsError';
+    this.name = "AzureDevOpsError";
     if (status !== undefined) this.status = status;
   }
 }
 
 const RATE_LIMIT_RETRY_DELAY_MS = 60_000;
-const API_VERSION = '7.0';
+const API_VERSION = "7.0";
 
 const configSchema = z.object({
   org: z
@@ -41,19 +44,19 @@ const configSchema = z.object({
     .string()
     .min(
       1,
-      'Azure DevOps project is empty. Pass the project name from dev.azure.com/{org}/{project}.',
+      "Azure DevOps project is empty. Pass the project name from dev.azure.com/{org}/{project}.",
     ),
   repositoryId: z
     .string()
     .min(
       1,
-      'Azure DevOps repositoryId is empty. Pass the repository name or GUID.',
+      "Azure DevOps repositoryId is empty. Pass the repository name or GUID.",
     ),
   pat: z
     .string()
     .min(
       1,
-      'Azure DevOps PAT is empty. Run: npx gitflow auth and store AZURE_DEVOPS_PAT.',
+      "Azure DevOps PAT is empty. Run: npx gitpilot auth and store AZURE_DEVOPS_PAT.",
     ),
 });
 
@@ -66,15 +69,12 @@ const prIdSchema = z
 
 const commentIdSchema = z
   .string()
-  .min(
-    1,
-    'commentId is empty. Pass the Azure DevOps thread id as a string.',
-  );
+  .min(1, "commentId is empty. Pass the Azure DevOps thread id as a string.");
 
 const createPRInputSchema = z.object({
   title: z
     .string()
-    .min(1, 'createPR title is empty. Pass a non-empty PR title.'),
+    .min(1, "createPR title is empty. Pass a non-empty PR title."),
   body: z.string(),
   sourceBranch: z
     .string()
@@ -99,14 +99,14 @@ const inlineIssueSchema = z.object({
     ),
   line: z
     .number()
-    .int('issue.line must be an integer line number.')
-    .positive('issue.line must be > 0. Pass a 1-based line number.'),
-  severity: z.enum(['blocker', 'warning', 'info'], {
+    .int("issue.line must be an integer line number.")
+    .positive("issue.line must be > 0. Pass a 1-based line number."),
+  severity: z.enum(["blocker", "warning", "info"], {
     message: 'issue.severity must be one of "blocker", "warning", "info".',
   }),
   comment: z
     .string()
-    .min(1, 'issue.comment is empty. Pass a non-empty review comment body.'),
+    .min(1, "issue.comment is empty. Pass a non-empty review comment body."),
   suggestedFix: z.string().optional(),
 });
 
@@ -131,15 +131,15 @@ function parseSeverity(body: string): CommentSeverity | undefined {
   const match = body.match(/^\[(BLOCKER|WARNING|INFO)\]/);
   if (!match) return undefined;
   const tag = match[1];
-  if (tag === 'BLOCKER') return 'blocker';
-  if (tag === 'WARNING') return 'warning';
-  return 'info';
+  if (tag === "BLOCKER") return "blocker";
+  if (tag === "WARNING") return "warning";
+  return "info";
 }
 
 function severityToThreadStatus(
-  severity: 'blocker' | 'warning' | 'info',
+  severity: "blocker" | "warning" | "info",
 ): number {
-  return severity === 'info' ? 4 : 1;
+  return severity === "info" ? 4 : 1;
 }
 
 async function delay(ms: number): Promise<void> {
@@ -152,7 +152,7 @@ async function readResponseText(response: Response): Promise<string> {
   try {
     return await response.text();
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -164,13 +164,13 @@ async function throwForStatus(
 
   if (response.status === 401) {
     throw new AzureDevOpsError(
-      'Azure DevOps PAT invalid or expired. Run: npx gitflow auth',
+      "Azure DevOps PAT invalid or expired. Run: npx gitpilot auth",
       401,
     );
   }
   if (response.status === 403) {
     throw new AzureDevOpsError(
-      'PAT lacks required permissions. Needs: Code (Read & Write), Pull Request Threads (Read & Write)',
+      "PAT lacks required permissions. Needs: Code (Read & Write), Pull Request Threads (Read & Write)",
       403,
     );
   }
@@ -182,16 +182,16 @@ async function throwForStatus(
       );
     }
     throw new AzureDevOpsError(
-      `Repository ${context.repositoryId} not found. Check org, project, and repository name in gitflow.config.yml`,
+      `Repository ${context.repositoryId} not found. Check org, project, and repository name in gitpilot.config.yml`,
       404,
     );
   }
   if (response.status === 409) {
-    throw new AzureDevOpsError('PR already exists for this branch', 409);
+    throw new AzureDevOpsError("PR already exists for this branch", 409);
   }
   if (response.status === 429) {
     throw new AzureDevOpsError(
-      'Azure DevOps rate limit exceeded after retry. Wait for the limit to reset, then re-run.',
+      "Azure DevOps rate limit exceeded after retry. Wait for the limit to reset, then re-run.",
       429,
     );
   }
@@ -265,13 +265,13 @@ interface CreatePullRequestResponse {
 }
 
 function buildFileDiff(path: string, changeType: string): string {
-  const cleanPath = path.replace(/^\//, '');
+  const cleanPath = path.replace(/^\//, "");
   return [
     `diff --git a/${cleanPath} b/${cleanPath}`,
     `--- a/${cleanPath}`,
     `+++ b/${cleanPath}`,
     `@@ change: ${changeType} @@`,
-  ].join('\n');
+  ].join("\n");
 }
 
 /**
@@ -285,7 +285,7 @@ function buildFileDiff(path: string, changeType: string): string {
  * `AzureDevOpsError` with a remediation hint. The PAT is never logged.
  */
 export class AzureDevOpsPlatform implements GitPlatform {
-  readonly name = 'Azure DevOps';
+  readonly name = "Azure DevOps";
   readonly #org: string;
   readonly #project: string;
   readonly #repositoryId: string;
@@ -296,7 +296,7 @@ export class AzureDevOpsPlatform implements GitPlatform {
     this.#org = validated.org;
     this.#project = validated.project;
     this.#repositoryId = validated.repositoryId;
-    const encoded = Buffer.from(`:${validated.pat}`).toString('base64');
+    const encoded = Buffer.from(`:${validated.pat}`).toString("base64");
     this.#authHeader = `Basic ${encoded}`;
   }
 
@@ -307,8 +307,8 @@ export class AzureDevOpsPlatform implements GitPlatform {
   #headers(): Record<string, string> {
     return {
       Authorization: this.#authHeader,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
+      "Content-Type": "application/json",
+      Accept: "application/json",
     };
   }
 
@@ -345,7 +345,7 @@ export class AzureDevOpsPlatform implements GitPlatform {
     const response = await azureFetch(
       url,
       {
-        method: 'POST',
+        method: "POST",
         headers: this.#headers(),
         body: JSON.stringify(body),
       },
@@ -354,7 +354,7 @@ export class AzureDevOpsPlatform implements GitPlatform {
     const data = (await response.json()) as CreatePullRequestResponse;
     return {
       id: String(data.pullRequestId),
-      url: data._links?.web?.href ?? '',
+      url: data._links?.web?.href ?? "",
       number: data.pullRequestId,
     };
   }
@@ -373,27 +373,27 @@ export class AzureDevOpsPlatform implements GitPlatform {
    */
   async getPRDiff(prId: string): Promise<string> {
     const validated = prIdSchema.parse(prId);
-    const prNumber = toIntegerId(validated, 'prId');
+    const prNumber = toIntegerId(validated, "prId");
     const ctx = this.#context(validated);
 
     const iterationsUrl = `${this.#baseUrl()}/git/repositories/${this.#repositoryId}/pullrequests/${prNumber}/iterations?api-version=${API_VERSION}`;
     const iterationsResponse = await azureFetch(
       iterationsUrl,
-      { method: 'GET', headers: this.#headers() },
+      { method: "GET", headers: this.#headers() },
       ctx,
     );
     const iterationsData =
       (await iterationsResponse.json()) as IterationsResponse;
     const iterations = iterationsData.value ?? [];
-    if (iterations.length === 0) return '';
+    if (iterations.length === 0) return "";
     const latest = iterations[iterations.length - 1];
-    if (!latest) return '';
+    if (!latest) return "";
     const latestIterationId = latest.id;
 
     const changesUrl = `${this.#baseUrl()}/git/repositories/${this.#repositoryId}/pullrequests/${prNumber}/iterations/${latestIterationId}/changes?api-version=${API_VERSION}`;
     const changesResponse = await azureFetch(
       changesUrl,
-      { method: 'GET', headers: this.#headers() },
+      { method: "GET", headers: this.#headers() },
       ctx,
     );
     const changesData = (await changesResponse.json()) as ChangesResponse;
@@ -403,10 +403,10 @@ export class AzureDevOpsPlatform implements GitPlatform {
     for (const entry of entries) {
       const path = entry.item?.path;
       if (!path) continue;
-      const changeType = entry.changeType ?? 'edit';
+      const changeType = entry.changeType ?? "edit";
       blocks.push(buildFileDiff(path, changeType));
     }
-    return blocks.join('\n');
+    return blocks.join("\n");
   }
 
   /**
@@ -425,7 +425,7 @@ export class AzureDevOpsPlatform implements GitPlatform {
   async postInlineComment(prId: string, issue: InlineIssue): Promise<void> {
     const validatedPr = prIdSchema.parse(prId);
     const validatedIssue = inlineIssueSchema.parse(issue);
-    const prNumber = toIntegerId(validatedPr, 'prId');
+    const prNumber = toIntegerId(validatedPr, "prId");
     const ctx = this.#context(validatedPr);
 
     const tag = `[${validatedIssue.severity.toUpperCase()}]`;
@@ -447,7 +447,7 @@ export class AzureDevOpsPlatform implements GitPlatform {
     await azureFetch(
       url,
       {
-        method: 'POST',
+        method: "POST",
         headers: this.#headers(),
         body: JSON.stringify(body),
       },
@@ -470,13 +470,13 @@ export class AzureDevOpsPlatform implements GitPlatform {
    */
   async getPRComments(prId: string): Promise<PRComment[]> {
     const validated = prIdSchema.parse(prId);
-    const prNumber = toIntegerId(validated, 'prId');
+    const prNumber = toIntegerId(validated, "prId");
     const ctx = this.#context(validated);
 
     const url = `${this.#baseUrl()}/git/repositories/${this.#repositoryId}/pullrequests/${prNumber}/threads?api-version=${API_VERSION}`;
     const response = await azureFetch(
       url,
-      { method: 'GET', headers: this.#headers() },
+      { method: "GET", headers: this.#headers() },
       ctx,
     );
     const data = (await response.json()) as ThreadResponse;
@@ -489,7 +489,7 @@ export class AzureDevOpsPlatform implements GitPlatform {
       if (!tc || !tc.filePath) continue;
       const firstComment = thread.comments?.[0];
       if (!firstComment) continue;
-      const body = firstComment.content ?? '';
+      const body = firstComment.content ?? "";
       const comment: PRComment = {
         id: String(thread.id),
         file: tc.filePath,
@@ -516,15 +516,15 @@ export class AzureDevOpsPlatform implements GitPlatform {
   async resolveComment(prId: string, commentId: string): Promise<void> {
     const validatedPr = prIdSchema.parse(prId);
     const validatedComment = commentIdSchema.parse(commentId);
-    const prNumber = toIntegerId(validatedPr, 'prId');
-    const threadId = toIntegerId(validatedComment, 'commentId');
+    const prNumber = toIntegerId(validatedPr, "prId");
+    const threadId = toIntegerId(validatedComment, "commentId");
     const ctx = this.#context(validatedPr);
 
     const url = `${this.#baseUrl()}/git/repositories/${this.#repositoryId}/pullrequests/${prNumber}/threads/${threadId}?api-version=${API_VERSION}`;
     await azureFetch(
       url,
       {
-        method: 'PATCH',
+        method: "PATCH",
         headers: this.#headers(),
         body: JSON.stringify({ status: 2 }),
       },

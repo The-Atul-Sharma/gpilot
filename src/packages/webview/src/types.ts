@@ -1,93 +1,113 @@
-import { z } from 'zod';
-
-export const pipelineStepSchema = z.object({
-  id: z.string().min(1, 'PipelineStep.id must be a non-empty string. Pass the step id from the extension host.'),
-  name: z.string().min(1, 'PipelineStep.name must be a non-empty string. Pass a human-readable label.'),
-  status: z.enum(['idle', 'running', 'done', 'failed']),
-});
+import { z } from "zod";
 
 export const inlineIssueSchema = z.object({
-  id: z.string().min(1, 'InlineIssue.id must be a non-empty string. Use the platform comment id.'),
-  file: z.string().min(1, 'InlineIssue.file must be a non-empty file path. Use the path from the review payload.'),
-  line: z
-    .number()
-    .int()
-    .nonnegative('InlineIssue.line must be a non-negative integer. Use 0 for file-level comments.'),
-  severity: z.enum(['blocker', 'warning', 'info']),
-  comment: z.string().min(1, 'InlineIssue.comment must be non-empty. Pass the review comment body.'),
+  id: z.string().min(1),
+  file: z.string().min(1),
+  line: z.number().int().nonnegative(),
+  severity: z.enum(["blocker", "warning", "info"]),
+  comment: z.string().min(1),
   suggestedFix: z.string().optional(),
 });
 
 export const modelEntrySchema = z.object({
-  label: z.string().min(1, 'ModelEntry.label must be non-empty.'),
-  provider: z.string().min(1, 'ModelEntry.provider must be non-empty.'),
-  model: z.string().min(1, 'ModelEntry.model must be non-empty.'),
+  label: z.string().min(1, "ModelEntry.label must be non-empty."),
+  provider: z.string().min(1, "ModelEntry.provider must be non-empty."),
+  model: z.string().min(1, "ModelEntry.model must be non-empty."),
 });
 
-export type PipelineStep = z.infer<typeof pipelineStepSchema>;
+export const repoStatusSchema = z.object({
+  branch: z.string().nullable(),
+  hasCommit: z.boolean(),
+  isBranchPushed: z.boolean(),
+  hasOpenPR: z.boolean(),
+});
+
+export const gitpilotModeSchema = z.enum(["gitpilot", "native"]);
+
 export type InlineIssue = z.infer<typeof inlineIssueSchema>;
 export type ModelEntry = z.infer<typeof modelEntrySchema>;
+export type RepoStatus = z.infer<typeof repoStatusSchema>;
+export type gitpilotMode = z.infer<typeof gitpilotModeSchema>;
 
-export const extensionMessageSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('pipelineUpdate'), steps: z.array(pipelineStepSchema) }),
-  z.object({ type: z.literal('reviewComplete'), issues: z.array(inlineIssueSchema) }),
+export const extensionMessageSchema = z.discriminatedUnion("type", [
   z.object({
-    type: z.literal('configUpdate'),
-    provider: z.string().min(1, 'configUpdate.provider must be non-empty.'),
-    model: z.string().min(1, 'configUpdate.model must be non-empty.'),
+    type: z.literal("configUpdate"),
+    provider: z.string().min(1),
+    model: z.string().min(1),
   }),
   z.object({
-    type: z.literal('modelOptionsUpdate'),
+    type: z.literal("modelOptionsUpdate"),
     models: z.array(modelEntrySchema),
   }),
   z.object({
-    type: z.literal('commandRunning'),
-    command: z.string().min(1, 'commandRunning.command must be non-empty.'),
+    type: z.literal("commandRunning"),
+    command: z.string().min(1),
   }),
   z.object({
-    type: z.literal('commandDone'),
-    command: z.string().min(1, 'commandDone.command must be non-empty.'),
+    type: z.literal("commandDone"),
+    command: z.string().min(1),
   }),
   z.object({
-    type: z.literal('commandFailed'),
-    command: z.string().min(1, 'commandFailed.command must be non-empty.'),
-    error: z.string().min(1, 'commandFailed.error must be non-empty. Pass the error message from the host.'),
+    type: z.literal("commandFailed"),
+    command: z.string().min(1),
+    error: z.string().min(1),
   }),
   z.object({
-    type: z.literal('setupStatus'),
+    type: z.literal("setupStatus"),
     aiConfigured: z.boolean(),
     platformConfigured: z.boolean(),
     ready: z.boolean(),
+  }),
+  z.object({
+    type: z.literal("commitDraft"),
+    message: z.string(),
+  }),
+  z.object({
+    type: z.literal("prDraft"),
+    title: z.string(),
+    description: z.string(),
+  }),
+  z.object({
+    type: z.literal("reviewResult"),
+    issues: z.array(inlineIssueSchema),
+  }),
+  z.object({
+    type: z.literal("repoStatus"),
+    status: repoStatusSchema,
+  }),
+  z.object({
+    type: z.literal("modeUpdate"),
+    mode: gitpilotModeSchema,
   }),
 ]);
 
 export type ExtensionMessage = z.infer<typeof extensionMessageSchema>;
 
-export const webviewMessageSchema = z.discriminatedUnion('type', [
+export const webviewMessageSchema = z.discriminatedUnion("type", [
   z.object({
-    type: z.literal('fixComment'),
-    prId: z.string().min(1, 'fixComment.prId must be non-empty. Pass the current PR id from App state.'),
-    commentId: z.string().min(1, 'fixComment.commentId must be non-empty. Use the InlineIssue id.'),
+    type: z.literal("switchModel"),
+    provider: z.string().min(1),
+    model: z.string().min(1),
   }),
+  z.object({ type: z.literal("setupKeys") }),
+  z.object({ type: z.literal("requestState") }),
+  z.object({ type: z.literal("refreshStatus") }),
+  z.object({ type: z.literal("generateCommit") }),
   z.object({
-    type: z.literal('fixAllBlockers'),
-    prId: z.string().min(1, 'fixAllBlockers.prId must be non-empty. Pass the current PR id from App state.'),
+    type: z.literal("commitMessage"),
+    message: z.string().min(1),
   }),
+  z.object({ type: z.literal("generatePr") }),
   z.object({
-    type: z.literal('dismissComment'),
-    commentId: z.string().min(1, 'dismissComment.commentId must be non-empty. Use the InlineIssue id.'),
+    type: z.literal("createPr"),
+    title: z.string().min(1),
+    description: z.string().min(1),
   }),
+  z.object({ type: z.literal("runReview") }),
   z.object({
-    type: z.literal('switchModel'),
-    provider: z.string().min(1, 'switchModel.provider must be non-empty. Use a value from the model list.'),
-    model: z.string().min(1, 'switchModel.model must be non-empty. Use a value from the model list.'),
+    type: z.literal("setMode"),
+    mode: gitpilotModeSchema,
   }),
-  z.object({
-    type: z.literal('runCommand'),
-    command: z.string().min(1, 'runCommand.command must be non-empty. Pass the gitflow CLI subcommand.'),
-  }),
-  z.object({ type: z.literal('setupKeys') }),
-  z.object({ type: z.literal('requestState') }),
 ]);
 
 export type WebviewMessage = z.infer<typeof webviewMessageSchema>;

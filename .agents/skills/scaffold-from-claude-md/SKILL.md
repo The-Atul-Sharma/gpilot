@@ -1,7 +1,6 @@
-
 ---
 name: scaffold-from-claude-md
-description: Scaffold the gitflow project structure from CLAUDE.md
+description: Scaffold the gitpilot project structure from CLAUDE.md
 ---
 
 Read the CLAUDE.md file at the project root and scaffold the project
@@ -12,7 +11,7 @@ Steps to perform:
 1. Create all folders listed in Project Layout
 2. Create empty index.ts placeholder files in each module folder
 3. Create empty .spec.md placeholder files matching each module name
-4. Create __tests__/ subfolders inside each module
+4. Create **tests**/ subfolders inside each module
 5. Generate tsconfig.json with these settings:
    - strict: true
    - module: NodeNext

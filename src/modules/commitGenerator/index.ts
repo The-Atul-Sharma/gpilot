@@ -1,11 +1,11 @@
-import { z } from 'zod';
-import type { AIProvider } from '../../core/ai/index.ts';
-import type { GitClient } from '../../core/git/index.ts';
+import { z } from "zod";
+import type { AIProvider } from "../../core/ai/index.ts";
+import type { GitClient } from "../../core/git/index.ts";
 import type {
   Confirmation,
   ConfirmMode,
   ConfirmResult,
-} from '../../core/confirmation/index.ts';
+} from "../../core/confirmation/index.ts";
 
 export interface CommitGeneratorInput {
   ai: AIProvider;
@@ -16,14 +16,14 @@ export interface CommitGeneratorInput {
 }
 
 export interface CommitGeneratorResult {
-  status: 'committed' | 'cancelled' | 'dryrun';
+  status: "committed" | "cancelled" | "dryrun";
   message?: string;
 }
 
 export class CommitGenerationError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'CommitGenerationError';
+    this.name = "CommitGenerationError";
   }
 }
 
@@ -31,46 +31,46 @@ const RECENT_COMMIT_COUNT = 5;
 const HEADER_MAX_LENGTH = 100;
 
 const CONVENTIONAL_TYPES = [
-  'feat',
-  'fix',
-  'docs',
-  'style',
-  'refactor',
-  'perf',
-  'test',
-  'build',
-  'ci',
-  'chore',
-  'revert',
+  "feat",
+  "fix",
+  "docs",
+  "style",
+  "refactor",
+  "perf",
+  "test",
+  "build",
+  "ci",
+  "chore",
+  "revert",
 ] as const;
 
 const HEADER_PATTERN = new RegExp(
-  `^(${CONVENTIONAL_TYPES.join('|')})(\\([^)]+\\))?!?: \\S.*`,
+  `^(${CONVENTIONAL_TYPES.join("|")})(\\([^)]+\\))?!?: \\S.*`,
 );
 
 const inputSchema = z.object({
   ai: z.custom<AIProvider>(
     (v) =>
       v !== null &&
-      typeof v === 'object' &&
-      typeof (v as AIProvider).complete === 'function',
-    'ai must be an AIProvider. Build one with createAIProvider() from core/ai.',
+      typeof v === "object" &&
+      typeof (v as AIProvider).complete === "function",
+    "ai must be an AIProvider. Build one with createAIProvider() from core/ai.",
   ),
   git: z.custom<GitClient>(
     (v) =>
       v !== null &&
-      typeof v === 'object' &&
-      typeof (v as GitClient).getStagedDiff === 'function',
-    'git must be a GitClient. Build one with createGitClient() from core/git.',
+      typeof v === "object" &&
+      typeof (v as GitClient).getStagedDiff === "function",
+    "git must be a GitClient. Build one with createGitClient() from core/git.",
   ),
   confirmation: z.custom<Confirmation>(
     (v) =>
       v !== null &&
-      typeof v === 'object' &&
-      typeof (v as Confirmation).ask === 'function',
-    'confirmation must be a Confirmation. Build one with createConfirmation() from core/confirmation.',
+      typeof v === "object" &&
+      typeof (v as Confirmation).ask === "function",
+    "confirmation must be a Confirmation. Build one with createConfirmation() from core/confirmation.",
   ),
-  mode: z.enum(['interactive', 'auto', 'dryrun'], {
+  mode: z.enum(["interactive", "auto", "dryrun"], {
     message:
       'mode must be one of "interactive", "auto", or "dryrun". Pass mode from the CLI flag (--auto / --dry-run).',
   }),
@@ -81,13 +81,13 @@ function buildPrompt(diff: string, recentMessages: string[]): string {
   const recentBlock = recentMessages.length
     ? `Recent commit messages on this branch (match their tone and style):\n${recentMessages
         .map((m) => `- ${m}`)
-        .join('\n')}\n\n`
-    : '';
+        .join("\n")}\n\n`
+    : "";
   return (
     `You are a senior engineer writing a Conventional Commit message.\n\n` +
     `Rules:\n` +
     `- First line: <type>(<scope>)?: <subject>\n` +
-    `- Allowed types: ${CONVENTIONAL_TYPES.join(', ')}\n` +
+    `- Allowed types: ${CONVENTIONAL_TYPES.join(", ")}\n` +
     `- HARD LIMIT: first line must be <= ${HEADER_MAX_LENGTH} characters\n` +
     `- If needed, shorten the subject so the first line fits <= ${HEADER_MAX_LENGTH}\n` +
     `- Subject: imperative mood, lowercase, no trailing period, <= 72 chars\n` +
@@ -100,18 +100,18 @@ function buildPrompt(diff: string, recentMessages: string[]): string {
 }
 
 function scopeFromPath(path: string): string {
-  const clean = path.replace(/^\.?\//, '');
-  const parts = clean.split('/').filter((p) => p.length > 0);
-  if (parts.length === 0) return 'root';
-  if (parts[0] === 'src') {
+  const clean = path.replace(/^\.?\//, "");
+  const parts = clean.split("/").filter((p) => p.length > 0);
+  if (parts.length === 0) return "root";
+  if (parts[0] === "src") {
     const srcParts = parts.slice(1);
-    if (srcParts[0] === 'packages' && srcParts[1]) {
+    if (srcParts[0] === "packages" && srcParts[1]) {
       return `packages/${srcParts[1]}`;
     }
-    return srcParts[0] ?? 'src';
+    return srcParts[0] ?? "src";
   }
-  if (parts[0] === 'specs') return 'specs';
-  return parts[0] ?? 'root';
+  if (parts[0] === "specs") return "specs";
+  return parts[0] ?? "root";
 }
 
 function decideCommitScope(stagedFiles: string[]): string | null {
@@ -121,7 +121,7 @@ function decideCommitScope(stagedFiles: string[]): string | null {
     const scope = scopeFromPath(file);
     counts.set(scope, (counts.get(scope) ?? 0) + 1);
   }
-  let winnerScope = '';
+  let winnerScope = "";
   let winnerCount = 0;
   for (const [scope, count] of counts.entries()) {
     if (count > winnerCount) {
@@ -147,13 +147,13 @@ function buildPromptWithScope(
   const recentBlock = recentMessages.length
     ? `Recent commit messages on this branch (match their tone and style):\n${recentMessages
         .map((m) => `- ${m}`)
-        .join('\n')}\n\n`
-    : '';
+        .join("\n")}\n\n`
+    : "";
   return (
     `You are a senior engineer writing a Conventional Commit message.\n\n` +
     `Rules:\n` +
     `- First line: <type>(<scope>)?: <subject>\n` +
-    `- Allowed types: ${CONVENTIONAL_TYPES.join(', ')}\n` +
+    `- Allowed types: ${CONVENTIONAL_TYPES.join(", ")}\n` +
     `${scopeRule}` +
     `- HARD LIMIT: first line must be <= ${HEADER_MAX_LENGTH} characters\n` +
     `- If needed, shorten the subject so the first line fits <= ${HEADER_MAX_LENGTH}\n` +
@@ -168,8 +168,11 @@ function buildPromptWithScope(
 
 function cleanMessage(raw: string): string {
   let text = raw.trim();
-  if (text.startsWith('```')) {
-    text = text.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '').trim();
+  if (text.startsWith("```")) {
+    text = text
+      .replace(/^```[a-zA-Z]*\n?/, "")
+      .replace(/```$/, "")
+      .trim();
   }
   if (
     (text.startsWith('"') && text.endsWith('"')) ||
@@ -183,64 +186,67 @@ function cleanMessage(raw: string): string {
 function normalizeHeader(header: string): string {
   return header.replace(
     /^((?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([^)]+\))?!?)\s+-\s+(\S.*)$/,
-    '$1: $2',
+    "$1: $2",
   );
 }
 
 function normalizeMessage(message: string): string {
-  const [header = '', ...rest] = message.split('\n');
+  const [header = "", ...rest] = message.split("\n");
   const normalizedHeader = normalizeHeader(header.trim());
-  return [normalizedHeader, ...rest].join('\n').trim();
+  return [normalizedHeader, ...rest].join("\n").trim();
 }
 
 function truncateHeaderToMaxLength(message: string): string {
-  const [header = '', ...rest] = message.split('\n');
+  const [header = "", ...rest] = message.split("\n");
   if (header.length <= HEADER_MAX_LENGTH) return message;
   const match = header.match(
     /^((?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([^)]+\))?!?: )(\S.*)$/,
   );
   if (!match) return message;
-  const prefix = match[1] ?? '';
-  const subject = match[2] ?? '';
+  const prefix = match[1] ?? "";
+  const subject = match[2] ?? "";
   const maxSubjectLength = HEADER_MAX_LENGTH - prefix.length;
   if (maxSubjectLength <= 0) return message;
   if (subject.length <= maxSubjectLength) return message;
   const hardSlice = subject.slice(0, maxSubjectLength).trimEnd();
-  const lastSpace = hardSlice.lastIndexOf(' ');
+  const lastSpace = hardSlice.lastIndexOf(" ");
   const shortened =
     lastSpace >= Math.floor(maxSubjectLength * 0.6)
       ? hardSlice.slice(0, lastSpace).trimEnd()
       : hardSlice;
   const rebuiltHeader = `${prefix}${shortened}`;
-  return [rebuiltHeader, ...rest].join('\n').trim();
+  return [rebuiltHeader, ...rest].join("\n").trim();
 }
 
-function enforceScopePolicy(message: string, requiredScope: string | null): string {
-  const [header = '', ...rest] = message.split('\n');
+function enforceScopePolicy(
+  message: string,
+  requiredScope: string | null,
+): string {
+  const [header = "", ...rest] = message.split("\n");
   const match = header.match(
     /^((?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert))(?:\(([^)]+)\))?(!?):\s+(\S.*)$/,
   );
   if (!match) return message;
-  const type = match[1] ?? '';
-  const bang = match[3] ?? '';
-  const subject = match[4] ?? '';
+  const type = match[1] ?? "";
+  const bang = match[3] ?? "";
+  const subject = match[4] ?? "";
   const scopedHeader =
     requiredScope === null
       ? `${type}${bang}: ${subject}`
       : `${type}(${requiredScope})${bang}: ${subject}`;
-  return [scopedHeader, ...rest].join('\n').trim();
+  return [scopedHeader, ...rest].join("\n").trim();
 }
 
 function validateMessage(message: string): void {
   if (!message) {
     throw new CommitGenerationError(
-      'AI returned an empty commit message. Choose regenerate, or switch providers/models in gitflow.config.yml.',
+      "AI returned an empty commit message. Choose regenerate, or switch providers/models in gitpilot.config.yml.",
     );
   }
-  const header = message.split('\n', 1)[0] ?? '';
+  const header = message.split("\n", 1)[0] ?? "";
   if (!header.trim()) {
     throw new CommitGenerationError(
-      'AI returned a commit message with no header line. Choose regenerate, or use edit to write one.',
+      "AI returned a commit message with no header line. Choose regenerate, or use edit to write one.",
     );
   }
   if (header.length > HEADER_MAX_LENGTH) {
@@ -284,7 +290,7 @@ export function createCommitGenerator(input: CommitGeneratorInput): {
       const diff = await git.getStagedDiff();
       if (!diff.trim()) {
         throw new CommitGenerationError(
-          'No staged changes. Run git add first.',
+          "No staged changes. Run git add first.",
         );
       }
 
@@ -294,40 +300,50 @@ export function createCommitGenerator(input: CommitGeneratorInput): {
       const requiredScope = decideCommitScope(stagedFiles);
 
       while (true) {
-        const prompt = buildPromptWithScope(diff, recentMessages, requiredScope);
+        const prompt = buildPromptWithScope(
+          diff,
+          recentMessages,
+          requiredScope,
+        );
         const raw = await ai.complete(prompt, { temperature: 0.2 });
         const message = truncateHeaderToMaxLength(
-          enforceScopePolicy(normalizeMessage(cleanMessage(raw)), requiredScope),
+          enforceScopePolicy(
+            normalizeMessage(cleanMessage(raw)),
+            requiredScope,
+          ),
         );
         validateMessage(message);
 
-        if (mode === 'dryrun') {
+        if (mode === "dryrun") {
           await confirmation.ask({ mode, preview: message });
-          return { status: 'dryrun', message };
+          return { status: "dryrun", message };
         }
 
         const result: ConfirmResult = await confirmation.ask({
           mode,
           preview: message,
-          actions: ['yes', 'no', 'edit', 'regenerate'],
+          actions: ["yes", "no", "edit", "regenerate"],
         });
 
-        if (result.action === 'yes') {
+        if (result.action === "yes") {
           if (shouldCreateCommit) {
             await git.commit(message);
           } else {
             await git.setCommitMessage(message);
           }
-          return { status: 'committed', message };
+          return { status: "committed", message };
         }
 
-        if (result.action === 'edit') {
+        if (result.action === "edit") {
           const edited = truncateHeaderToMaxLength(
-            enforceScopePolicy(normalizeMessage(result.editedText.trim()), requiredScope),
+            enforceScopePolicy(
+              normalizeMessage(result.editedText.trim()),
+              requiredScope,
+            ),
           );
           if (!edited) {
             throw new CommitGenerationError(
-              'Edited commit message is empty. Re-run the command and provide non-empty text in the editor.',
+              "Edited commit message is empty. Re-run the command and provide non-empty text in the editor.",
             );
           }
           if (shouldCreateCommit) {
@@ -335,14 +351,14 @@ export function createCommitGenerator(input: CommitGeneratorInput): {
           } else {
             await git.setCommitMessage(edited);
           }
-          return { status: 'committed', message: edited };
+          return { status: "committed", message: edited };
         }
 
-        if (result.action === 'regenerate') {
+        if (result.action === "regenerate") {
           continue;
         }
 
-        return { status: 'cancelled' };
+        return { status: "cancelled" };
       }
     },
   };

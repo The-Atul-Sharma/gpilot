@@ -1,14 +1,14 @@
-import { z } from 'zod';
-import chalk from 'chalk';
-import type { AIProvider } from '../../core/ai/index.ts';
-import type { GitClient } from '../../core/git/index.ts';
+import { z } from "zod";
+import chalk from "chalk";
+import type { AIProvider } from "../../core/ai/index.ts";
+import type { GitClient } from "../../core/git/index.ts";
 import type {
   Confirmation,
   ConfirmMode,
-} from '../../core/confirmation/index.ts';
-import type { GitPlatform as PrCreatorGitPlatform } from '../prCreator/index.ts';
+} from "../../core/confirmation/index.ts";
+import type { GitPlatform as PrCreatorGitPlatform } from "../prCreator/index.ts";
 
-export type IssueSeverity = 'blocker' | 'warning' | 'info';
+export type IssueSeverity = "blocker" | "warning" | "info";
 
 export interface InlineIssue {
   file: string;
@@ -40,14 +40,14 @@ export interface PrReviewerInput {
 }
 
 export interface PrReviewerResult {
-  status: 'posted' | 'reviewed' | 'cancelled' | 'dryrun';
+  status: "posted" | "reviewed" | "cancelled" | "dryrun";
   issues: InlineIssue[];
 }
 
 export class PrReviewerError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'PrReviewerError';
+    this.name = "PrReviewerError";
   }
 }
 
@@ -55,40 +55,43 @@ const MAX_DIFF_CHARS = 60_000;
 
 const DEFAULT_RULES: readonly ReviewRule[] = [
   {
-    id: 'no-console-logs',
-    description: 'Flag console.log calls left in production code.',
-    severity: 'warning',
+    id: "no-console-logs",
+    description: "Flag console.log calls left in production code.",
+    severity: "warning",
   },
   {
-    id: 'no-hardcoded-secrets',
+    id: "no-hardcoded-secrets",
     description:
-      'Flag API keys, tokens, passwords, or other secrets embedded directly in code.',
-    severity: 'blocker',
+      "Flag API keys, tokens, passwords, or other secrets embedded directly in code.",
+    severity: "blocker",
   },
   {
-    id: 'no-any-in-typescript',
-    description: 'Flag `: any` type annotations in TypeScript code.',
-    severity: 'warning',
+    id: "no-any-in-typescript",
+    description: "Flag `: any` type annotations in TypeScript code.",
+    severity: "warning",
   },
   {
-    id: 'tests-required',
+    id: "tests-required",
     description:
-      'Flag newly added exported functions that lack a matching test file.',
-    severity: 'info',
+      "Flag newly added exported functions that lack a matching test file.",
+    severity: "info",
   },
   {
-    id: 'no-todo-comments',
-    description: 'Flag TODO and FIXME comments left in the diff.',
-    severity: 'info',
+    id: "no-todo-comments",
+    description: "Flag TODO and FIXME comments left in the diff.",
+    severity: "info",
   },
 ];
 
-const severitySchema = z.enum(['blocker', 'warning', 'info']);
+const severitySchema = z.enum(["blocker", "warning", "info"]);
 
 const reviewRuleSchema = z.object({
   id: z
     .string()
-    .min(1, 'rule id is empty. Set "id" to a non-empty string in gitflow.config.yml.'),
+    .min(
+      1,
+      'rule id is empty. Set "id" to a non-empty string in gitpilot.config.yml.',
+    ),
   description: z
     .string()
     .min(
@@ -107,12 +110,14 @@ const inlineIssueSchema = z.object({
     ),
   line: z
     .number()
-    .int('issue.line must be an integer line number from the new file version.')
-    .positive('issue.line must be > 0. Use the line number from the new file version.'),
+    .int("issue.line must be an integer line number from the new file version.")
+    .positive(
+      "issue.line must be > 0. Use the line number from the new file version.",
+    ),
   severity: severitySchema,
   comment: z
     .string()
-    .min(1, 'issue.comment is empty. The AI must explain the problem.'),
+    .min(1, "issue.comment is empty. The AI must explain the problem."),
   suggestedFix: z.string().nullable().optional(),
 });
 
@@ -120,46 +125,46 @@ const inputSchema = z.object({
   ai: z.custom<AIProvider>(
     (v) =>
       v !== null &&
-      typeof v === 'object' &&
-      typeof (v as AIProvider).complete === 'function',
-    'ai must be an AIProvider. Build one with createAIProvider() from core/ai.',
+      typeof v === "object" &&
+      typeof (v as AIProvider).complete === "function",
+    "ai must be an AIProvider. Build one with createAIProvider() from core/ai.",
   ),
   git: z.custom<GitClient>(
     (v) =>
       v !== null &&
-      typeof v === 'object' &&
-      typeof (v as GitClient).getDiffAgainst === 'function' &&
-      typeof (v as GitClient).getDefaultBranch === 'function',
-    'git must be a GitClient. Build one with createGitClient() from core/git.',
+      typeof v === "object" &&
+      typeof (v as GitClient).getDiffAgainst === "function" &&
+      typeof (v as GitClient).getDefaultBranch === "function",
+    "git must be a GitClient. Build one with createGitClient() from core/git.",
   ),
   platform: z.custom<GitPlatform>(
     (v) =>
       v !== null &&
-      typeof v === 'object' &&
-      typeof (v as GitPlatform).getPRDiff === 'function' &&
-      typeof (v as GitPlatform).postInlineComment === 'function',
-    'platform must be a GitPlatform with getPRDiff() and postInlineComment(). Build one with createGithubPlatform() or createAzureDevopsPlatform().',
+      typeof v === "object" &&
+      typeof (v as GitPlatform).getPRDiff === "function" &&
+      typeof (v as GitPlatform).postInlineComment === "function",
+    "platform must be a GitPlatform with getPRDiff() and postInlineComment(). Build one with createGithubPlatform() or createAzureDevopsPlatform().",
   ),
   confirmation: z.custom<Confirmation>(
     (v) =>
       v !== null &&
-      typeof v === 'object' &&
-      typeof (v as Confirmation).ask === 'function',
-    'confirmation must be a Confirmation. Build one with createConfirmation() from core/confirmation.',
+      typeof v === "object" &&
+      typeof (v as Confirmation).ask === "function",
+    "confirmation must be a Confirmation. Build one with createConfirmation() from core/confirmation.",
   ),
-  mode: z.enum(['interactive', 'auto', 'dryrun'], {
+  mode: z.enum(["interactive", "auto", "dryrun"], {
     message:
       'mode must be one of "interactive", "auto", or "dryrun". Pass mode from the CLI flag (--auto / --dry-run).',
   }),
   rules: z.array(reviewRuleSchema, {
     message:
-      'rules must be an array of ReviewRule objects. Pass [] to use the built-in default rules.',
+      "rules must be an array of ReviewRule objects. Pass [] to use the built-in default rules.",
   }),
   prId: z
     .string()
     .min(
       1,
-      'prId is empty. Pass a non-empty PR id to review a remote PR, or omit to review the local branch diff.',
+      "prId is empty. Pass a non-empty PR id to review a remote PR, or omit to review the local branch diff.",
     )
     .optional(),
 });
@@ -172,7 +177,7 @@ function truncateDiff(diff: string): string {
 function buildPrompt(diff: string, rules: readonly ReviewRule[]): string {
   const ruleBlock = rules
     .map((r) => `- ${r.id} (${r.severity}): ${r.description}`)
-    .join('\n');
+    .join("\n");
   return (
     `You are a senior engineer performing a strict code review on a pull request diff.\n\n` +
     `Output a single JSON array of issues. No code fences, no preface, no commentary outside the JSON.\n` +
@@ -192,18 +197,21 @@ function buildPrompt(diff: string, rules: readonly ReviewRule[]): string {
 
 function stripCodeFence(raw: string): string {
   let text = raw.trim();
-  if (text.startsWith('```')) {
-    text = text.replace(/^```[a-zA-Z]*\n?/, '').replace(/```\s*$/, '').trim();
+  if (text.startsWith("```")) {
+    text = text
+      .replace(/^```[a-zA-Z]*\n?/, "")
+      .replace(/```\s*$/, "")
+      .trim();
   }
   return text;
 }
 
 function extractJsonArray(text: string): string {
-  const start = text.indexOf('[');
-  const end = text.lastIndexOf(']');
+  const start = text.indexOf("[");
+  const end = text.lastIndexOf("]");
   if (start === -1 || end === -1 || end <= start) {
     throw new PrReviewerError(
-      'AI did not return a JSON array of issues. Re-run, or switch providers/models in gitflow.config.yml.',
+      "AI did not return a JSON array of issues. Re-run, or switch providers/models in gitpilot.config.yml.",
     );
   }
   return text.slice(start, end + 1);
@@ -218,16 +226,16 @@ function parseIssues(raw: string): InlineIssue[] {
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     throw new PrReviewerError(
-      `AI output was not valid JSON (${reason}). Re-run, or switch providers/models in gitflow.config.yml.`,
+      `AI output was not valid JSON (${reason}). Re-run, or switch providers/models in gitpilot.config.yml.`,
     );
   }
   const result = z.array(inlineIssueSchema).safeParse(parsed);
   if (!result.success) {
     const issue = result.error.issues[0];
-    const path = issue?.path.join('.') ?? '';
-    const message = issue?.message ?? 'invalid issue structure';
+    const path = issue?.path.join(".") ?? "";
+    const message = issue?.message ?? "invalid issue structure";
     throw new PrReviewerError(
-      `AI output failed validation${path ? ` at "${path}"` : ''}: ${message}. Re-run, or switch providers/models in gitflow.config.yml.`,
+      `AI output failed validation${path ? ` at "${path}"` : ""}: ${message}. Re-run, or switch providers/models in gitpilot.config.yml.`,
     );
   }
   return result.data.map((d) => {
@@ -237,7 +245,7 @@ function parseIssues(raw: string): InlineIssue[] {
       severity: d.severity,
       comment: d.comment,
     };
-    if (typeof d.suggestedFix === 'string') {
+    if (typeof d.suggestedFix === "string") {
       issue.suggestedFix = d.suggestedFix;
     }
     return issue;
@@ -253,8 +261,8 @@ function severityCounts(issues: InlineIssue[]): {
   let warnings = 0;
   let infos = 0;
   for (const i of issues) {
-    if (i.severity === 'blocker') blockers++;
-    else if (i.severity === 'warning') warnings++;
+    if (i.severity === "blocker") blockers++;
+    else if (i.severity === "warning") warnings++;
     else infos++;
   }
   return { blockers, warnings, infos };
@@ -267,7 +275,7 @@ function summarize(issues: InlineIssue[]): string {
     const head = `[${i.severity}] ${i.file}:${i.line} — ${i.comment}`;
     return i.suggestedFix ? `${head}\n  fix: ${i.suggestedFix}` : head;
   });
-  return [header, '', ...lines].join('\n');
+  return [header, "", ...lines].join("\n");
 }
 
 interface EnquirerLike {
@@ -280,10 +288,10 @@ async function loadEnquirer(): Promise<EnquirerLike | null> {
   if (enquirerPromise) return enquirerPromise;
   enquirerPromise = (async () => {
     try {
-      const mod = (await import('enquirer')) as
+      const mod = (await import("enquirer")) as
         | EnquirerLike
         | { default: EnquirerLike };
-      return 'default' in mod && mod.default
+      return "default" in mod && mod.default
         ? mod.default
         : (mod as EnquirerLike);
     } catch {
@@ -293,27 +301,27 @@ async function loadEnquirer(): Promise<EnquirerLike | null> {
   return enquirerPromise;
 }
 
-type PostChoice = 'yes' | 'select' | 'no';
+type PostChoice = "yes" | "select" | "no";
 
 async function askPostChoice(): Promise<PostChoice> {
   const enquirer = await loadEnquirer();
-  if (!enquirer) return 'no';
+  if (!enquirer) return "no";
   try {
     const response = await enquirer.prompt({
-      type: 'select',
-      name: 'choice',
-      message: chalk.cyan('Post issues as inline comments?'),
+      type: "select",
+      name: "choice",
+      message: chalk.cyan("Post issues as inline comments?"),
       choices: [
-        { name: 'yes', message: 'post all issues' },
-        { name: 'select', message: 'select which to post' },
-        { name: 'no', message: 'do not post' },
+        { name: "yes", message: "post all issues" },
+        { name: "select", message: "select which to post" },
+        { name: "no", message: "do not post" },
       ],
     });
-    const v = response['choice'];
-    if (v === 'yes' || v === 'select' || v === 'no') return v;
-    return 'no';
+    const v = response["choice"];
+    if (v === "yes" || v === "select" || v === "no") return v;
+    return "no";
   } catch {
-    return 'no';
+    return "no";
   }
 }
 
@@ -322,10 +330,10 @@ async function selectIssues(issues: InlineIssue[]): Promise<InlineIssue[]> {
   if (!enquirer) return [];
   try {
     const response = await enquirer.prompt({
-      type: 'multiselect',
-      name: 'selected',
+      type: "multiselect",
+      name: "selected",
       message: chalk.cyan(
-        'Toggle which issues to post (space to select, enter to confirm)',
+        "Toggle which issues to post (space to select, enter to confirm)",
       ),
       choices: issues.map((i, idx) => ({
         name: String(idx),
@@ -333,7 +341,7 @@ async function selectIssues(issues: InlineIssue[]): Promise<InlineIssue[]> {
         value: String(idx),
       })),
     });
-    const selected = response['selected'];
+    const selected = response["selected"];
     if (!Array.isArray(selected)) return [];
     return selected
       .map((s) => Number(s))
@@ -404,7 +412,7 @@ export function createPrReviewer(input: PrReviewerInput): {
         : await git.getDiffAgainst(await git.getDefaultBranch());
 
       if (!diff.trim()) {
-        return { status: 'reviewed', issues: [] };
+        return { status: "reviewed", issues: [] };
       }
 
       const raw = await ai.complete(buildPrompt(diff, rules), {
@@ -413,38 +421,38 @@ export function createPrReviewer(input: PrReviewerInput): {
       const issues = parseIssues(raw);
 
       if (issues.length === 0) {
-        return { status: 'reviewed', issues: [] };
+        return { status: "reviewed", issues: [] };
       }
 
       const preview = summarize(issues);
 
-      if (mode === 'dryrun') {
+      if (mode === "dryrun") {
         await confirmation.ask({ mode, preview });
-        return { status: 'dryrun', issues };
+        return { status: "dryrun", issues };
       }
 
       process.stdout.write(`${preview}\n`);
 
       if (!prId) {
-        return { status: 'reviewed', issues };
+        return { status: "reviewed", issues };
       }
 
-      if (mode === 'auto') {
+      if (mode === "auto") {
         await postAll(platform, prId, issues);
-        return { status: 'posted', issues };
+        return { status: "posted", issues };
       }
 
       const choice = await askPostChoice();
-      if (choice === 'no') {
-        return { status: 'reviewed', issues };
+      if (choice === "no") {
+        return { status: "reviewed", issues };
       }
 
-      const toPost = choice === 'select' ? await selectIssues(issues) : issues;
+      const toPost = choice === "select" ? await selectIssues(issues) : issues;
       if (toPost.length === 0) {
-        return { status: 'reviewed', issues };
+        return { status: "reviewed", issues };
       }
       await postAll(platform, prId, toPost);
-      return { status: 'posted', issues: toPost };
+      return { status: "posted", issues: toPost };
     },
   };
 }

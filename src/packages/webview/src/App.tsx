@@ -1,45 +1,65 @@
-import { useEffect, useState } from 'react';
-import type { ExtensionMessage, InlineIssue, ModelEntry, PipelineStep } from './types.js';
-import { extensionMessageSchema } from './types.js';
-import { sendMessage } from './vsCodeApi.js';
-import { ensureSpinnerKeyframes, layout } from './styles.js';
-import { PipelineStatus } from './components/PipelineStatus.js';
-import { ReviewCommentList } from './components/ReviewCommentList.js';
-import { ModelSwitcher } from './components/ModelSwitcher.js';
+import { useEffect, useState } from "react";
+import type {
+  ExtensionMessage,
+  gitpilotMode,
+  InlineIssue,
+  ModelEntry,
+  RepoStatus,
+} from "./types.js";
+import { extensionMessageSchema } from "./types.js";
+import { sendMessage } from "./vsCodeApi.js";
+import { layout } from "./styles.js";
+import { ManageKeys } from "./components/ManageKeys.js";
+import { CommitPanel } from "./components/CommitPanel.js";
+import { PrPanel } from "./components/PrPanel.js";
+import { ReviewPanel } from "./components/ReviewPanel.js";
+import { ModeToggle } from "./components/ModeToggle.js";
+import { ModelSwitcher } from "./components/ModelSwitcher.js";
 
 interface CurrentModel {
   provider: string;
   model: string;
 }
 
-interface AppProps {
-  initialPrId?: string;
-}
-
-const DEFAULT_MODEL: CurrentModel = { provider: 'claude', model: 'claude-sonnet-4-6' };
+const DEFAULT_MODEL: CurrentModel = {
+  provider: "claude",
+  model: "claude-sonnet-4-6",
+};
 const DEFAULT_MODEL_OPTIONS: ReadonlyArray<ModelEntry> = [
-  { label: 'Claude Sonnet 4.6', provider: 'claude', model: 'claude-sonnet-4-6' },
+  {
+    label: "Claude Sonnet 4.6",
+    provider: "claude",
+    model: "claude-sonnet-4-6",
+  },
 ];
+const DEFAULT_STATUS: RepoStatus = {
+  branch: null,
+  hasCommit: false,
+  isBranchPushed: false,
+  hasOpenPR: false,
+};
 
-/**
- * Root webview component. Owns all state, listens for messages from the
- * extension host, and routes outbound actions through sendMessage.
- */
-export function App({ initialPrId = '' }: AppProps) {
-  const [steps, setSteps] = useState<PipelineStep[]>([]);
-  const [issues, setIssues] = useState<InlineIssue[]>([]);
+export function App() {
   const [currentModel, setCurrentModel] = useState<CurrentModel>(DEFAULT_MODEL);
-  const [modelOptions, setModelOptions] = useState<ReadonlyArray<ModelEntry>>(DEFAULT_MODEL_OPTIONS);
+  const [modelOptions, setModelOptions] = useState<ReadonlyArray<ModelEntry>>(
+    DEFAULT_MODEL_OPTIONS,
+  );
   const [runningCommand, setRunningCommand] = useState<string | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const [ready, setReady] = useState<boolean>(false);
   const [aiConfigured, setAiConfigured] = useState<boolean>(false);
   const [platformConfigured, setPlatformConfigured] = useState<boolean>(false);
-  const [prId] = useState<string>(initialPrId);
-
-  useEffect(() => {
-    ensureSpinnerKeyframes();
-  }, []);
+  const [mode, setMode] = useState<gitpilotMode>("gitpilot");
+  const [repoStatus, setRepoStatus] = useState<RepoStatus>(DEFAULT_STATUS);
+  const [commitDraft, setCommitDraft] = useState<string>("");
+  const [prDraft, setPrDraft] = useState<{
+    title: string;
+    description: string;
+  }>({
+    title: "",
+    description: "",
+  });
+  const [issues, setIssues] = useState<InlineIssue[]>([]);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent): void => {
@@ -48,151 +68,198 @@ export function App({ initialPrId = '' }: AppProps) {
       handleExtensionMessage(result.data);
     };
     const requestLatestState = (): void => {
-      sendMessage({ type: 'requestState' });
+      sendMessage({ type: "requestState" });
     };
-    window.addEventListener('message', onMessage);
-    window.addEventListener('focus', requestLatestState);
-    document.addEventListener('visibilitychange', requestLatestState);
+    window.addEventListener("message", onMessage);
+    window.addEventListener("focus", requestLatestState);
+    document.addEventListener("visibilitychange", requestLatestState);
     requestLatestState();
     return () => {
-      window.removeEventListener('message', onMessage);
-      window.removeEventListener('focus', requestLatestState);
-      document.removeEventListener('visibilitychange', requestLatestState);
+      window.removeEventListener("message", onMessage);
+      window.removeEventListener("focus", requestLatestState);
+      document.removeEventListener("visibilitychange", requestLatestState);
     };
   }, []);
 
   function handleExtensionMessage(message: ExtensionMessage): void {
     switch (message.type) {
-      case 'pipelineUpdate':
-        setSteps(message.steps);
-        return;
-      case 'reviewComplete':
-        setIssues(message.issues);
-        return;
-      case 'configUpdate':
+      case "configUpdate":
         setCurrentModel({ provider: message.provider, model: message.model });
         return;
-      case 'modelOptionsUpdate':
+      case "modelOptionsUpdate":
         setModelOptions(message.models);
         return;
-      case 'commandRunning':
+      case "commandRunning":
         setRunningCommand(message.command);
         setLastError(null);
         return;
-      case 'commandDone':
-        setRunningCommand((current) => (current === message.command ? null : current));
+      case "commandDone":
+        setRunningCommand((current) =>
+          current === message.command ? null : current,
+        );
         return;
-      case 'commandFailed':
-        setRunningCommand((current) => (current === message.command ? null : current));
+      case "commandFailed":
+        setRunningCommand((current) =>
+          current === message.command ? null : current,
+        );
         setLastError(`${message.command}: ${message.error}`);
         return;
-      case 'setupStatus':
+      case "setupStatus":
         setReady(message.ready);
         setAiConfigured(message.aiConfigured);
         setPlatformConfigured(message.platformConfigured);
         return;
+      case "commitDraft":
+        setCommitDraft(message.message);
+        return;
+      case "prDraft":
+        setPrDraft({ title: message.title, description: message.description });
+        return;
+      case "reviewResult":
+        setIssues(message.issues);
+        return;
+      case "repoStatus":
+        setRepoStatus(message.status);
+        return;
+      case "modeUpdate":
+        setMode(message.mode);
+        return;
     }
-  }
-
-  function handleFix(targetPrId: string, commentId: string): void {
-    if (!targetPrId) {
-      setLastError('Cannot fix comment without a PR id. Open the panel from a PR review first.');
-      return;
-    }
-    sendMessage({ type: 'fixComment', prId: targetPrId, commentId });
-  }
-
-  function handleDismiss(commentId: string): void {
-    sendMessage({ type: 'dismissComment', commentId });
-    setIssues((current) => current.filter((issue) => issue.id !== commentId));
   }
 
   function handleSwitchModel(provider: string, model: string): void {
-    sendMessage({ type: 'switchModel', provider, model });
+    sendMessage({ type: "switchModel", provider, model });
     setCurrentModel({ provider, model });
   }
 
   function handleSetupKeys(): void {
-    sendMessage({ type: 'setupKeys' });
+    sendMessage({ type: "setupKeys" });
   }
 
-  function handleRunCommand(command: 'commit' | 'pr' | 'review' | 'status'): void {
-    sendMessage({ type: 'runCommand', command });
+  function handleSetMode(next: gitpilotMode): void {
+    sendMessage({ type: "setMode", mode: next });
+    setMode(next);
   }
 
-  return (
-    <div style={layout.app}>
-      {!ready ? (
-        <section style={layout.section} aria-label="Setup Keys">
+  function handleGenerateCommit(): void {
+    sendMessage({ type: "generateCommit" });
+  }
+
+  function handleCommit(message: string): void {
+    sendMessage({ type: "commitMessage", message });
+  }
+
+  function handleGeneratePr(): void {
+    sendMessage({ type: "generatePr" });
+  }
+
+  function handleCreatePr(title: string, description: string): void {
+    sendMessage({ type: "createPr", title, description });
+  }
+
+  function handleRunReview(): void {
+    sendMessage({ type: "runReview" });
+  }
+
+  if (!ready) {
+    return (
+      <div style={layout.app}>
+        <section style={layout.section} aria-label="Setup Required">
           <h2 style={layout.sectionTitle}>Setup Required</h2>
           <div style={layout.card}>
             <p style={{ margin: 0 }}>
-              Set at least one AI key and one platform key before using the panel.
+              Set at least one AI key and one platform key before using the
+              panel.
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, opacity: 0.8 }}>
-              <span>AI key: {aiConfigured ? 'configured' : 'missing'}</span>
-              <span>Platform key: {platformConfigured ? 'configured' : 'missing'}</span>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+                fontSize: 12,
+                opacity: 0.8,
+              }}
+            >
+              <span>AI key: {aiConfigured ? "configured" : "missing"}</span>
+              <span>
+                Platform key: {platformConfigured ? "configured" : "missing"}
+              </span>
             </div>
             <div>
-              <button style={layout.primaryButton} onClick={handleSetupKeys} type="button">
+              <button
+                style={layout.primaryButton}
+                onClick={handleSetupKeys}
+                type="button"
+              >
                 Setup keys
               </button>
             </div>
           </div>
         </section>
-      ) : null}
-      {ready ? (
-        <>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button style={layout.secondaryButton} onClick={handleSetupKeys} type="button">
-          Manage keys
-        </button>
       </div>
+    );
+  }
+
+  return (
+    <div style={layout.app}>
+      <ModeToggle mode={mode} onChange={handleSetMode} />
       {runningCommand ? (
-        <div style={{ opacity: 0.8, fontSize: 12 }} data-testid="running-banner">
+        <div
+          style={{ opacity: 0.8, fontSize: 12 }}
+          data-testid="running-banner"
+        >
           Running: {runningCommand}…
         </div>
       ) : null}
       {lastError ? (
         <div
-          style={{ color: 'var(--vscode-errorForeground)', fontSize: 12 }}
+          style={{ color: "var(--vscode-errorForeground)", fontSize: 12 }}
           data-testid="error-banner"
         >
           {lastError}
         </div>
       ) : null}
-      <PipelineStatus steps={steps} />
-      <ReviewCommentList
-        issues={issues}
-        prId={prId}
-        onFix={handleFix}
-        onDismiss={handleDismiss}
+
+      <ManageKeys
+        provider={currentModel.provider}
+        aiConfigured={aiConfigured}
+        platformConfigured={platformConfigured}
+        onManage={handleSetupKeys}
       />
+
+      <CommitPanel
+        mode={mode}
+        draft={commitDraft}
+        running={runningCommand === "commit"}
+        onGenerate={handleGenerateCommit}
+        onCommit={handleCommit}
+        onDraftChange={setCommitDraft}
+      />
+
+      {repoStatus.hasOpenPR ? (
+        <ReviewPanel
+          issues={issues}
+          running={runningCommand === "review"}
+          onRun={handleRunReview}
+        />
+      ) : (
+        <PrPanel
+          mode={mode}
+          status={repoStatus}
+          draft={prDraft}
+          running={runningCommand === "pr"}
+          onGenerate={handleGeneratePr}
+          onCreate={handleCreatePr}
+          onDraftChange={setPrDraft}
+        />
+      )}
+
       <ModelSwitcher
         currentProvider={currentModel.provider}
         currentModel={currentModel.model}
         models={modelOptions}
         onChange={handleSwitchModel}
       />
-      <section style={layout.section} aria-label="Pipeline Actions">
-        <h2 style={layout.sectionTitle}>Pipeline Actions</h2>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button style={layout.primaryButton} type="button" onClick={() => handleRunCommand('commit')}>
-            Generate commit
-          </button>
-          <button style={layout.primaryButton} type="button" onClick={() => handleRunCommand('pr')}>
-            Create PR + description
-          </button>
-          <button style={layout.secondaryButton} type="button" onClick={() => handleRunCommand('review')}>
-            Review before push
-          </button>
-          <button style={layout.secondaryButton} type="button" onClick={() => handleRunCommand('status')}>
-            Show status
-          </button>
-        </div>
-      </section>
-        </>
-      ) : null}
     </div>
   );
 }

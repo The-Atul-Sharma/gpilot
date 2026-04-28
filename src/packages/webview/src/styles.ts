@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import type { InlineIssue, PipelineStep } from './types.js';
+import type { InlineIssue } from './types.js';
 
 export const colors = {
   background: 'var(--vscode-editor-background)',
@@ -89,24 +89,6 @@ export const layout: Record<string, CSSProperties> = {
   },
 };
 
-const stepColors: Record<PipelineStep['status'], string> = {
-  idle: 'rgba(128,128,128,0.6)',
-  running: 'var(--vscode-progressBar-background, #007acc)',
-  done: 'var(--vscode-testing-iconPassed, #4caf50)',
-  failed: colors.errorForeground,
-};
-
-export function statusDot(status: PipelineStep['status']): CSSProperties {
-  return {
-    width: 10,
-    height: 10,
-    borderRadius: '50%',
-    background: stepColors[status],
-    flexShrink: 0,
-    animation: status === 'running' ? 'gitflow-spin 1s linear infinite' : undefined,
-  };
-}
-
 const severityColors: Record<InlineIssue['severity'], string> = {
   blocker: colors.errorForeground,
   warning: colors.warningForeground,
@@ -128,13 +110,3 @@ export function severityPill(severity: InlineIssue['severity']): CSSProperties {
   };
 }
 
-/** Inject the keyframes used by the running indicator dot exactly once. */
-export function ensureSpinnerKeyframes(): void {
-  if (typeof document === 'undefined') return;
-  const id = 'gitflow-spin-keyframes';
-  if (document.getElementById(id)) return;
-  const style = document.createElement('style');
-  style.id = id;
-  style.textContent = '@keyframes gitflow-spin { to { transform: rotate(360deg); } }';
-  document.head.appendChild(style);
-}

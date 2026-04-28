@@ -1,56 +1,60 @@
 # Module: platforms/github
 
 ## Purpose
+
 Implement the GitPlatform interface for GitHub using the GitHub REST API.
 All feature modules talk to this via the interface — no module imports
 GitHub-specific code directly.
 
 ## Dependencies
+
 - core/secrets — GITHUB_TOKEN retrieval
 - @octokit/rest — GitHub REST API client
 
 ## Public API
+
 ```ts
 export interface GitHubConfig {
-  owner: string      // GitHub org or username
-  repo: string       // repository name
-  token: string      // GITHUB_TOKEN from secrets
+  owner: string; // GitHub org or username
+  repo: string; // repository name
+  token: string; // GITHUB_TOKEN from secrets
 }
 
 export class GitHubPlatform implements GitPlatform {
-  constructor(config: GitHubConfig)
+  constructor(config: GitHubConfig);
 
   // From prCreator
-  createPR(input: CreatePRInput): Promise<CreatedPR>
+  createPR(input: CreatePRInput): Promise<CreatedPR>;
 
-  // From prReviewer  
-  getPRDiff(prId: string): Promise<string>
-  postInlineComment(prId: string, issue: InlineIssue): Promise<void>
+  // From prReviewer
+  getPRDiff(prId: string): Promise<string>;
+  postInlineComment(prId: string, issue: InlineIssue): Promise<void>;
 
   // From commentFixer
-  getPRComments(prId: string): Promise<PRComment[]>
-  resolveComment(prId: string, commentId: string): Promise<void>
+  getPRComments(prId: string): Promise<PRComment[]>;
+  resolveComment(prId: string, commentId: string): Promise<void>;
 }
 
-export function createGitHubPlatform(
-  config: GitHubConfig
-): GitPlatform
+export function createGitHubPlatform(config: GitHubConfig): GitPlatform;
 ```
 
 ## Implementation details
 
 ### createPR
+
 - POST /repos/{owner}/{repo}/pulls
 - Map CreatePRInput.sourceBranch → head
 - Map CreatePRInput.targetBranch → base
 - Return id as string(pull_number), url, number
 
 ### getPRDiff
+
 - GET /repos/{owner}/{repo}/pulls/{pull_number}
 - Set Accept: application/vnd.github.v3.diff header
 - Returns raw unified diff as string
 
 ### postInlineComment
+
 - POST /repos/{owner}/{repo}/pulls/{pull_number}/comments
 - Map InlineIssue.file → path
 - Map InlineIssue.line → line
@@ -60,6 +64,7 @@ export function createGitHubPlatform(
 - commit_id: get from latest commit on PR head
 
 ### getPRComments
+
 - GET /repos/{owner}/{repo}/pulls/{pull_number}/comments
 - Map GitHub response to PRComment interface:
   - id: string(comment.id)
@@ -69,23 +74,26 @@ export function createGitHubPlatform(
   - severity: parse from body prefix [BLOCKER]/[WARNING]/[INFO] if present
 
 ### resolveComment
+
 - GitHub has no native "resolve" for review comments
 - Instead mark as outdated by replying with a fixed marker
 - POST /repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies
   body: "✓ Fixed"
 
 ## Rules
+
 - All API calls must include Authorization: Bearer {token} header
 - Retry once on 429 (rate limit) with 60 second delay
 - Throw GitHubError on 4xx/5xx responses including the status and message
 - prId is always a string — convert to number before passing to Octokit
-- Never log the token value, only mask last 4 chars for debug: "****abcd"
+- Never log the token value, only mask last 4 chars for debug: "\*\*\*\*abcd"
 - owner and repo parsed from git remote URL if not explicitly provided
 - Use @octokit/rest not raw fetch for all API calls
 
 ## Error cases
+
 - 401 Unauthorized → GitHubError "GitHub token invalid or expired.
-  Run: npx gitflow auth"
+  Run: npx gitpilot auth"
 - 403 Forbidden → GitHubError "GitHub token lacks required permissions.
   Needs: repo, pull_requests"
 - 404 Not Found → GitHubError "PR #{prId} not found in {owner}/{repo}"
@@ -94,6 +102,7 @@ export function createGitHubPlatform(
 - Network failure → wrap in GitHubError with original message
 
 ## Tests required
+
 - createPR calls correct endpoint with mapped fields
 - createPR returns CreatedPR with id, url, number
 - getPRDiff calls diff endpoint with correct Accept header

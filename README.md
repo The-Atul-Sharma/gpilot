@@ -1,91 +1,177 @@
-# gitflow
+# 🚀 gitpilot
 
-CLI tool **and VS Code extension** that automates the git workflow — commit
-messages, PR creation, PR descriptions, and PR reviews — using configurable
-AI providers.
+[![npm version](https://img.shields.io/npm/v/gitpilot.svg)](https://www.npmjs.com/package/gitpilot)
+[![npm downloads](https://img.shields.io/npm/dw/gitpilot.svg)](https://www.npmjs.com/package/gitpilot)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/your-publisher.gitpilot)](https://marketplace.visualstudio.com/items?itemName=your-publisher.gitpilot)
+[![VS Code Installs](https://img.shields.io/visual-studio-marketplace/i/your-publisher.gitpilot)](https://marketplace.visualstudio.com/items?itemName=your-publisher.gitpilot)
+[![License](https://img.shields.io/npm/l/gitpilot)](./LICENSE)
 
-## Features
+AI-powered **Git workflow automation CLI and VS Code extension**.
 
-### CLI
+> Generate commits → create pull requests → review code → fix issues — all in one flow.
 
-- Generate conventional-commit messages from staged changes
-- Create pull requests with AI-written titles and descriptions
-- Review PRs against a configurable rule set
-- Apply review-comment fixes interactively
-- Pluggable AI providers (Anthropic, OpenAI, Gemini, Ollama fallback)
-- Pluggable git platforms (GitHub, Azure DevOps, GitLab)
-- Secrets stored in the OS keychain via `keytar`
+---
 
-### VS Code extension
+## ✨ Features
 
-- Activity-bar entry with a sidebar **gitflow panel** (React webview)
-- Pipeline view showing live status of each step (commit → PR → description
-  → review → fix)
-- Review-comment list with severity badges and one-click **Fix** / **Dismiss**
-  actions
-- **Model switcher** — pick between Claude, GPT, Gemini, or any locally
-  installed Ollama model; updates `gitflow.config.yml` automatically
-- **Status bar** indicator (`gitflow ready` / `running…` / `N blockers`)
-  that focuses the panel on click
-- First-launch onboarding that prompts for the AI and platform keys it
-  needs and stores them in the OS keychain
-- Command palette entries:
-  - `gitflow: Generate commit message`
-  - `gitflow: Create PR with description`
-  - `gitflow: Review current PR`
-  - `gitflow: Fix all blocker comments`
-  - `gitflow: Fix selected comment`
-  - `gitflow: Switch AI model`
-  - `gitflow: Setup or update API keys`
-  - `gitflow: Show gitflow panel`
-  - `gitflow: Show status`
+### 🖥️ CLI
 
-The extension never imports the CLI directly — every action shells out to
-`npx gitflow …` in a dedicated terminal, so behavior stays identical to
-the CLI.
+- ✍️ Generate **conventional commit messages** from staged changes
+- 🔀 Create pull requests with **AI-generated titles & descriptions**
+- 🔍 Review PRs against configurable rules
+- 🛠️ Apply review fixes interactively
+- 🧪 Dry-run support for safe previews
+- 📊 Repository state detection via `gitpilot status`
+- 🤖 Pluggable AI providers:
+  - OpenAI (GPT)
+  - Anthropic (Claude)
+  - Google (Gemini)
+  - Ollama (local models)
+- 🔌 Pluggable platforms:
+  - GitHub
+  - Azure DevOps
+  - GitLab (extensible)
+- 🔐 Secure secrets via OS keychain (`keytar`)
 
-## Requirements
+---
 
-- Node.js >= 24
-- A git repository
-- API keys for the providers you intend to use
-- VS Code >= 1.85 (only if you want the extension)
+### 🧩 VS Code Extension
 
-## Installation
+A clean, task-focused sidebar for your Git workflow.
 
-### CLI
+#### ✍️ Commit Flow
+
+- Generate commit messages using AI
+- Edit before committing
+- Commit using your final message
+
+---
+
+#### 🔀 Pull Request Flow
+
+- Automatically detects repository state
+
+**If branch is not pushed:**
+
+- Generate PR title and description
+- Edit before creating PR
+- Push + create PR in one step
+
+**If PR already exists:**
+
+- Skip creation and go to review
+
+---
+
+#### 🔍 Code Review
+
+- Generate AI-powered reviews
+- Structured output:
+  - 🚫 Blocker
+  - ⚠️ Warning
+  - ℹ️ Info
+- Includes file and line references when available
+
+---
+
+#### 🔁 Mode Toggle
+
+Switch between:
+
+- 🤖 **Gitpilot (AI-powered)**
+- 🧑‍💻 **Native Git**
+
+---
+
+#### 🤖 Model Switcher
+
+- Claude, GPT, Gemini, or local Ollama models
+- Automatically updates `gitpilot.config.yml`
+
+---
+
+#### 🔑 Key Management
+
+- Manage API keys from within VS Code
+- Secure storage via OS keychain
+
+---
+
+#### 🧭 Commands
+
+- `gitpilot: Generate commit message`
+- `gitpilot: Create PR with description`
+- `gitpilot: Review current PR`
+- `gitpilot: Fix all blocker comments`
+- `gitpilot: Fix selected comment`
+- `gitpilot: Switch AI model`
+- `gitpilot: Setup or update API keys`
+- `gitpilot: Show panel`
+- `gitpilot: Show status`
+- `gitpilot: Toggle between AI and Native Git`
+
+#### ⚙️ Settings (`settings.json`)
+
+- `gitpilot.defaultMode` — `"gitpilot"` or `"native"`
+- `gitpilot.cliCommand` — override the CLI invocation (default
+  `npx gitpilot`)
+
+---
+
+## 🧠 How It Works
+
+The VS Code extension runs all actions via:
 
 ```bash
-npm install
-npm run build
-npm link    # exposes the `gitflow` binary globally
+gitpilot ...
 ```
 
-For local development without linking:
+This ensures:
+
+- Consistent CLI + extension behavior
+- No duplicated logic
+- Easier maintenance
+
+---
+
+## 📦 Requirements
+
+- Node.js >= 18
+- A Git repository
+- API keys for selected providers
+- VS Code >= 1.85
+
+---
+
+## 📥 Installation
+
+### 🖥️ CLI
 
 ```bash
-npm run dev -- <command>
+npm install -g gitpilot
 ```
 
-### VS Code extension
-
-A pre-built `gitflow-1.0.0.vsix` ships in `src/packages/extension/`. Install
-it with:
+Verify:
 
 ```bash
-code --install-extension src/packages/extension/gitflow-1.0.0.vsix
+gitpilot --help
 ```
 
-Or, in VS Code: **Extensions → … menu → Install from VSIX…** and pick the
-file.
+### 🧩 VS Code Extension
 
-## Configuration
+Install from **VS Code Marketplace**:
 
-### Environment variables
+1. Open Extensions (`Cmd/Ctrl + Shift + X`)
+2. Search for **gitpilot**
+3. Click **Install**
 
-Copy `.env.example` to `.env` and fill in the keys you need:
+---
 
-```
+## ⚙️ Configuration
+
+### 🌱 Environment Variables
+
+```bash
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
 GITHUB_TOKEN=
@@ -94,107 +180,117 @@ AZURE_DEVOPS_ORG=
 AZURE_DEVOPS_PROJECT=
 ```
 
-Secrets can also be stored in the OS keychain instead of `.env`. The
-extension's first-launch flow and `gitflow: Setup or update API keys`
-command both write to the keychain under the `gitflow` service.
+---
 
-### `gitflow.config.yml`
+### 🔐 Secure Storage
 
-Project-level configuration lives in `gitflow.config.yml` at the repo
-root. It controls the AI provider, target platform, interaction mode for
-each command, and review rules. The extension's **Switch AI model** action
-edits the `ai.provider` / `ai.model` fields in this file. See the file in
-this repo for a working example.
+API keys can be stored in OS keychain:
 
-## Usage
+- Used during extension onboarding
+- Managed via: `gitpilot: Setup or update API keys`
+
+---
+
+### 🧾 gitpilot.config.yml
+
+Controls:
+
+- AI provider and model
+- Git platform
+- Interaction mode (`interactive` / `auto`)
+- Review rules
+
+---
+
+## 🚀 Usage
 
 ### CLI
 
 ```bash
-gitflow commit              # generate and create a commit from staged changes
-gitflow pr create           # open a pull request for the current branch
-gitflow pr describe         # write or refresh a PR description
-gitflow pr review <number>  # run an AI review against the configured rules
-gitflow fix                 # apply review-comment fixes interactively
+gitpilot commit --dry-run
+gitpilot commit
+
+gitpilot pr create --dry-run
+gitpilot pr create
+
+gitpilot pr review
+gitpilot fix
+
+gitpilot status
 ```
 
-Each command honours the `mode` setting (`interactive` or `auto`) from
-`gitflow.config.yml`.
+---
 
-### VS Code extension
+### VS Code Extension
 
-1. Click the **gitflow** icon in the activity bar to open the side panel.
-2. On first launch, the extension prompts for at least one AI key and one
-   platform token. Pick **Set up keys** to walk through the flow.
-3. Use the panel buttons or the command palette (`Cmd/Ctrl + Shift + P`,
-   then type `gitflow:`) to run any action.
-4. The status bar item reflects pipeline progress. After a review, it
-   shows the blocker count — click it to focus the panel.
+1. Open **gitpilot panel**
+2. Generate and edit commit message
+3. Commit changes
+4. Create PR (if applicable)
+5. Run AI review
 
-## Project layout
+---
 
-```
+## 🧱 Project Structure
+
+```bash
 src/
-  cli/          entry point
-  core/         ai, git, secrets, confirmation
-  modules/      commitGenerator, prCreator, prDescription, prReviewer, commentFixer
-  platforms/    github, azureDevops
+  cli/          CLI entry
+  core/         AI, git, secrets, utilities
+  modules/      commit, PR, review, fix
+  platforms/    Git providers
   packages/
-    extension/  VS Code extension (extension host)
-    webview/    React + Vite sidebar UI
+    extension/  VS Code extension
+    webview/    React UI
 ```
 
-Module specs live alongside the code in `*.spec.md` files; the high-level
-architecture spec is in `specs/architecture.spec.md`.
+---
 
-## Development
+## 🧪 Local Development & Testing
 
-### Root CLI
+### 🧩 Package and Install Extension Locally
 
-```bash
-npm run dev      # run the CLI from source via tsx
-npm run build    # compile TypeScript to dist/
-npm test         # run vitest
-```
-
-### VS Code extension — building and testing locally
-
-The extension's `npm run build` script does everything in one go: it
-builds the React webview, copies the bundle into `media/webview/`, and
-compiles the extension's TypeScript to `dist/`.
-
-```bash
-# 1. Install dependencies for both packages
-cd src/packages/webview     && npm install
-cd ../extension             && npm install
-
-# 2. Build (builds webview, copies it, then compiles the extension)
-npm run build               # from src/packages/extension
-```
-
-To package and install the extension locally for testing:
+To package and install the VS Code extension locally:
 
 ```bash
 cd src/packages/extension
-npx @vscode/vsce package                       # produces gitflow-<version>.vsix
-code --install-extension gitflow-1.0.0.vsix    # install into VS Code
+npx @vscode/vsce package # produces gitpilot-<version>.vsix
+code --install-extension gitpilot-1.0.0.vsix
 ```
 
-After installation, reload VS Code and click the **gitflow** icon in the
-activity bar to use it.
+After installation:
 
-For iterative work, you can also debug the extension without packaging:
+- Reload VS Code
+- Click the **gitpilot** icon in the activity bar to open the panel
 
-1. Open the **`src/packages/extension`** folder in a fresh VS Code window
-   (so the bundled `.vscode/launch.json` is picked up).
-2. Press `F5` (or **Run → Start Debugging**). This launches an
-   **Extension Development Host** with the freshly built extension loaded.
-3. In the dev host, open any git repository, click the gitflow activity-bar
-   icon, and exercise the panel.
+---
 
-After making changes, re-run `npm run build` and reload the Extension
-Development Host (`Cmd/Ctrl + R`) to pick up the new bundle.
+### 🖥️ CLI Local Testing
 
-## License
+To test the CLI locally during development:
+
+```bash
+npm install
+npm run build
+npm link
+```
+
+---
+
+### 🧪 Debug Extension
+
+1. Open `src/packages/extension` in VS Code
+2. Press `F5`
+3. Test in Extension Development Host
+
+---
+
+## 🔍 Keywords
+
+AI git workflow, commit message generator, AI PR generator, AI code review, git automation CLI, VS Code git assistant, developer productivity
+
+---
+
+## 📄 License
 
 MIT

@@ -1,12 +1,12 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export type SecretKey =
-  | 'ANTHROPIC_API_KEY'
-  | 'OPENAI_API_KEY'
-  | 'GEMINI_API_KEY'
-  | 'GITHUB_TOKEN'
-  | 'AZURE_DEVOPS_PAT'
-  | 'GITLAB_TOKEN';
+  | "ANTHROPIC_API_KEY"
+  | "OPENAI_API_KEY"
+  | "GEMINI_API_KEY"
+  | "GITHUB_TOKEN"
+  | "AZURE_DEVOPS_PAT"
+  | "GITLAB_TOKEN";
 
 export interface Secrets {
   set(key: SecretKey, value: string): Promise<void>;
@@ -19,32 +19,36 @@ export class SecretNotFoundError extends Error {
   readonly key: SecretKey;
 
   constructor(key: SecretKey) {
-    super(`Secret ${key} not found. Run: npx gitflow auth`);
-    this.name = 'SecretNotFoundError';
+    super(`Secret ${key} not found. Run: npx gitpilot auth`);
+    this.name = "SecretNotFoundError";
     this.key = key;
   }
 }
 
-const SERVICE_NAME = 'gitflow';
+const SERVICE_NAME = "gitpilot";
 
 const secretKeySchema = z.enum([
-  'ANTHROPIC_API_KEY',
-  'OPENAI_API_KEY',
-  'GEMINI_API_KEY',
-  'GITHUB_TOKEN',
-  'AZURE_DEVOPS_PAT',
-  'GITLAB_TOKEN',
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "GEMINI_API_KEY",
+  "GITHUB_TOKEN",
+  "AZURE_DEVOPS_PAT",
+  "GITLAB_TOKEN",
 ]);
 
 const secretValueSchema = z
   .string()
   .min(
     1,
-    'Secret value is empty. Pass the API key or token string itself, not an empty string.',
+    "Secret value is empty. Pass the API key or token string itself, not an empty string.",
   );
 
 interface KeytarLike {
-  setPassword(service: string, account: string, password: string): Promise<void>;
+  setPassword(
+    service: string,
+    account: string,
+    password: string,
+  ): Promise<void>;
   getPassword(service: string, account: string): Promise<string | null>;
   deletePassword(service: string, account: string): Promise<boolean>;
 }
@@ -55,10 +59,12 @@ async function loadKeytar(): Promise<KeytarLike | null> {
   if (keytarPromise) return keytarPromise;
   keytarPromise = (async () => {
     try {
-      const mod = (await import('keytar')) as
+      const mod = (await import("keytar")) as
         | KeytarLike
         | { default: KeytarLike };
-      return 'default' in mod && mod.default ? mod.default : (mod as KeytarLike);
+      return "default" in mod && mod.default
+        ? mod.default
+        : (mod as KeytarLike);
     } catch {
       return null;
     }

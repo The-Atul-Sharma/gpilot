@@ -1,11 +1,11 @@
-import { z } from 'zod';
-import type { AIProvider } from '../../core/ai/index.ts';
-import type { GitClient } from '../../core/git/index.ts';
+import { z } from "zod";
+import type { AIProvider } from "../../core/ai/index.ts";
+import type { GitClient } from "../../core/git/index.ts";
 import type {
   Confirmation,
   ConfirmMode,
   ConfirmResult,
-} from '../../core/confirmation/index.ts';
+} from "../../core/confirmation/index.ts";
 
 export interface PrDescriptionInput {
   ai: AIProvider;
@@ -16,7 +16,7 @@ export interface PrDescriptionInput {
 }
 
 export interface PrDescriptionResult {
-  status: 'generated' | 'cancelled' | 'dryrun';
+  status: "generated" | "cancelled" | "dryrun";
   title?: string;
   body?: string;
 }
@@ -24,7 +24,7 @@ export interface PrDescriptionResult {
 export class PrDescriptionError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'PrDescriptionError';
+    this.name = "PrDescriptionError";
   }
 }
 
@@ -34,65 +34,66 @@ const MAX_DIFF_CHARS = 60_000;
 const MAX_FILES_LISTED = 50;
 
 const DEFAULT_TEMPLATE = [
-  '## Summary',
-  '<one short paragraph describing what this PR does and why>',
-  '',
-  '## Changes',
-  '- <bullet for each meaningful change>',
-  '',
-  '## Testing',
-  '- <how this was tested or how a reviewer can verify>',
-  '',
-  '## Notes',
-  '- <risks, follow-ups, or anything reviewers should pay attention to>',
-].join('\n');
+  "## Summary",
+  "<one short paragraph describing what this PR does and why>",
+  "",
+  "## Changes",
+  "- <bullet for each meaningful change>",
+  "",
+  "## Testing",
+  "- <how this was tested or how a reviewer can verify>",
+  "",
+  "## Notes",
+  "- <risks, follow-ups, or anything reviewers should pay attention to>",
+].join("\n");
 
 const inputSchema = z.object({
   ai: z.custom<AIProvider>(
     (v) =>
       v !== null &&
-      typeof v === 'object' &&
-      typeof (v as AIProvider).complete === 'function',
-    'ai must be an AIProvider. Build one with createAIProvider() from core/ai.',
+      typeof v === "object" &&
+      typeof (v as AIProvider).complete === "function",
+    "ai must be an AIProvider. Build one with createAIProvider() from core/ai.",
   ),
   git: z.custom<GitClient>(
     (v) =>
       v !== null &&
-      typeof v === 'object' &&
-      typeof (v as GitClient).getDiffAgainst === 'function',
-    'git must be a GitClient. Build one with createGitClient() from core/git.',
+      typeof v === "object" &&
+      typeof (v as GitClient).getDiffAgainst === "function",
+    "git must be a GitClient. Build one with createGitClient() from core/git.",
   ),
   confirmation: z.custom<Confirmation>(
     (v) =>
       v !== null &&
-      typeof v === 'object' &&
-      typeof (v as Confirmation).ask === 'function',
-    'confirmation must be a Confirmation. Build one with createConfirmation() from core/confirmation.',
+      typeof v === "object" &&
+      typeof (v as Confirmation).ask === "function",
+    "confirmation must be a Confirmation. Build one with createConfirmation() from core/confirmation.",
   ),
-  mode: z.enum(['interactive', 'auto', 'dryrun'], {
+  mode: z.enum(["interactive", "auto", "dryrun"], {
     message:
       'mode must be one of "interactive", "auto", or "dryrun". Pass mode from the CLI flag (--auto / --dry-run).',
   }),
   template: z
     .string()
-    .min(1, 'template is empty. Pass a non-empty markdown string or omit to use the default template.')
+    .min(
+      1,
+      "template is empty. Pass a non-empty markdown string or omit to use the default template.",
+    )
     .optional(),
 });
 
 function truncateDiff(diff: string): string {
   if (diff.length <= MAX_DIFF_CHARS) return diff;
-  return (
-    `${diff.slice(0, MAX_DIFF_CHARS)}\n\n[diff truncated at ${MAX_DIFF_CHARS} chars]`
-  );
+  return `${diff.slice(0, MAX_DIFF_CHARS)}\n\n[diff truncated at ${MAX_DIFF_CHARS} chars]`;
 }
 
 function formatFiles(files: string[]): string {
-  if (files.length === 0) return '(no files changed)';
+  if (files.length === 0) return "(no files changed)";
   const listed = files.slice(0, MAX_FILES_LISTED).map((f) => `- ${f}`);
   if (files.length > MAX_FILES_LISTED) {
     listed.push(`- ...and ${files.length - MAX_FILES_LISTED} more`);
   }
-  return listed.join('\n');
+  return listed.join("\n");
 }
 
 function buildPrompt(
@@ -104,8 +105,8 @@ function buildPrompt(
   const recentBlock = recentMessages.length
     ? `Recent commits on this branch (use them as the source of truth for intent):\n${recentMessages
         .map((m) => `- ${m}`)
-        .join('\n')}\n\n`
-    : '';
+        .join("\n")}\n\n`
+    : "";
   return (
     `You are a senior engineer writing a pull request description.\n\n` +
     `Output a single JSON object with exactly two string fields: "title" and "body". ` +
@@ -123,18 +124,21 @@ function buildPrompt(
 
 function stripCodeFence(raw: string): string {
   let text = raw.trim();
-  if (text.startsWith('```')) {
-    text = text.replace(/^```[a-zA-Z]*\n?/, '').replace(/```\s*$/, '').trim();
+  if (text.startsWith("```")) {
+    text = text
+      .replace(/^```[a-zA-Z]*\n?/, "")
+      .replace(/```\s*$/, "")
+      .trim();
   }
   return text;
 }
 
 function extractJsonObject(text: string): string {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
   if (start === -1 || end === -1 || end <= start) {
     throw new PrDescriptionError(
-      'AI did not return a JSON object. Choose regenerate, or switch providers/models in gitflow.config.yml.',
+      "AI did not return a JSON object. Choose regenerate, or switch providers/models in gitpilot.config.yml.",
     );
   }
   return text.slice(start, end + 1);
@@ -143,12 +147,9 @@ function extractJsonObject(text: string): string {
 const outputSchema = z.object({
   title: z
     .string()
-    .min(1, 'title is empty')
-    .max(
-      TITLE_MAX_LENGTH,
-      `title exceeds ${TITLE_MAX_LENGTH} chars`,
-    ),
-  body: z.string().min(1, 'body is empty'),
+    .min(1, "title is empty")
+    .max(TITLE_MAX_LENGTH, `title exceeds ${TITLE_MAX_LENGTH} chars`),
+  body: z.string().min(1, "body is empty"),
 });
 
 function parseOutput(raw: string): { title: string; body: string } {
@@ -165,7 +166,7 @@ function parseOutput(raw: string): { title: string; body: string } {
   }
   const result = outputSchema.safeParse(parsed);
   if (!result.success) {
-    const issue = result.error.issues[0]?.message ?? 'invalid structure';
+    const issue = result.error.issues[0]?.message ?? "invalid structure";
     throw new PrDescriptionError(
       `AI output failed validation: ${issue}. Choose regenerate, or use edit to write the description manually.`,
     );
@@ -184,18 +185,18 @@ function parseEdited(text: string): { title: string; body: string } {
   const trimmed = text.trim();
   if (!trimmed) {
     throw new PrDescriptionError(
-      'Edited PR description is empty. Re-run the command and provide a title on the first line and body below.',
+      "Edited PR description is empty. Re-run the command and provide a title on the first line and body below.",
     );
   }
-  const newlineIndex = trimmed.indexOf('\n');
+  const newlineIndex = trimmed.indexOf("\n");
   if (newlineIndex === -1) {
-    return { title: trimmed, body: '' };
+    return { title: trimmed, body: "" };
   }
   const title = trimmed.slice(0, newlineIndex).trim();
   const body = trimmed.slice(newlineIndex + 1).trim();
   if (!title) {
     throw new PrDescriptionError(
-      'Edited PR description has no title on the first line. Put the PR title on line 1 and the body on line 3 onward.',
+      "Edited PR description has no title on the first line. Put the PR title on line 1 and the body on line 3 onward.",
     );
   }
   return { title, body };
@@ -238,13 +239,13 @@ export function createPrDescription(input: PrDescriptionInput): {
 
       if (!currentBranch) {
         throw new PrDescriptionError(
-          'Not on a branch (detached HEAD). Check out a feature branch with git switch <branch>.',
+          "Not on a branch (detached HEAD). Check out a feature branch with git switch <branch>.",
         );
       }
 
       if (currentBranch === defaultBranch) {
         throw new PrDescriptionError(
-          'Cannot generate PR description from default branch.',
+          "Cannot generate PR description from default branch.",
         );
       }
 
@@ -267,31 +268,35 @@ export function createPrDescription(input: PrDescriptionInput): {
         const raw = await ai.complete(prompt, { temperature: 0.2 });
         const { title, body } = parseOutput(raw);
 
-        if (mode === 'dryrun') {
+        if (mode === "dryrun") {
           await confirmation.ask({ mode, preview: renderPreview(title, body) });
-          return { status: 'dryrun', title, body };
+          return { status: "dryrun", title, body };
         }
 
         const result: ConfirmResult = await confirmation.ask({
           mode,
           preview: renderPreview(title, body),
-          actions: ['yes', 'no', 'edit', 'regenerate'],
+          actions: ["yes", "no", "edit", "regenerate"],
         });
 
-        if (result.action === 'yes') {
-          return { status: 'generated', title, body };
+        if (result.action === "yes") {
+          return { status: "generated", title, body };
         }
 
-        if (result.action === 'edit') {
+        if (result.action === "edit") {
           const edited = parseEdited(result.editedText);
-          return { status: 'generated', title: edited.title, body: edited.body };
+          return {
+            status: "generated",
+            title: edited.title,
+            body: edited.body,
+          };
         }
 
-        if (result.action === 'regenerate') {
+        if (result.action === "regenerate") {
           continue;
         }
 
-        return { status: 'cancelled' };
+        return { status: "cancelled" };
       }
     },
   };

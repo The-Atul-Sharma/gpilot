@@ -1,4 +1,4 @@
-# gitflow
+# gitpilot
 
 CLI tool that automates git workflow — commit messages, PR creation,
 PR descriptions, and PR reviews — using configurable AI providers.
@@ -15,58 +15,58 @@ PR descriptions, and PR reviews — using configurable AI providers.
 
 The repository must follow this structure:
 
-gitflow/
-  .gitignore
-  .env.example
-  CLAUDE.md
-  package.json
-  tsconfig.json
-  specs/
-    architecture.spec.md
-  src/
-  cli/
-    index.ts
-  modules/
-  commitGenerator/
-    index.ts
-    commitGenerator.spec.md
-    **tests**/
-  prCreator/
-    index.ts
-    prCreator.spec.md
-    **tests**/
-  prDescription/
-    index.ts
-    prDescription.spec.md
-    **tests**/
-  prReviewer/
-    index.ts
-    prReviewer.spec.md
-    **tests**/
-  commentFixer/
-    index.ts
-    commentFixer.spec.md
-    **tests**/
-  core/
-  ai/
-    index.ts
-    ai.spec.md
-  git/
-    index.ts
-    git.spec.md
-  secrets/
-    index.ts
-    secrets.spec.md
-  confirmation/
-    index.ts
-    confirmation.spec.md
-  platforms/
-  github/
-    index.ts
-    github.spec.md
-  azureDevops/
-    index.ts
-    azureDevops.spec.md
+gitpilot/
+.gitignore
+.env.example
+CLAUDE.md
+package.json
+tsconfig.json
+specs/
+architecture.spec.md
+src/
+cli/
+index.ts
+modules/
+commitGenerator/
+index.ts
+commitGenerator.spec.md
+**tests**/
+prCreator/
+index.ts
+prCreator.spec.md
+**tests**/
+prDescription/
+index.ts
+prDescription.spec.md
+**tests**/
+prReviewer/
+index.ts
+prReviewer.spec.md
+**tests**/
+commentFixer/
+index.ts
+commentFixer.spec.md
+**tests**/
+core/
+ai/
+index.ts
+ai.spec.md
+git/
+index.ts
+git.spec.md
+secrets/
+index.ts
+secrets.spec.md
+confirmation/
+index.ts
+confirmation.spec.md
+platforms/
+github/
+index.ts
+github.spec.md
+azureDevops/
+index.ts
+azureDevops.spec.md
 
 ## Required files content
 

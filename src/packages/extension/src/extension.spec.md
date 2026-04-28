@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Expose all gitflow commands inside VS Code via the command palette,
+Expose all gitpilot commands inside VS Code via the command palette,
 sidebar panel, and source control context menus. Developers never need
 to open a terminal — everything works from inside VS Code.
 
@@ -16,174 +16,126 @@ to open a terminal — everything works from inside VS Code.
 
 ## Commands registered (command palette via Cmd+Shift+P)
 
-| Command ID               | Label                                  |
-| ------------------------ | -------------------------------------- |
-| gitflow.commit           | gitflow: Generate commit message       |
-| gitflow.createPR         | gitflow: Create PR with description    |
-| gitflow.reviewPR         | gitflow: Review current PR             |
-| gitflow.fixAllBlockers   | gitflow: Fix all blocker comments      |
-| gitflow.fixComment       | gitflow: Fix selected comment          |
-| gitflow.generateSpec     | gitflow: Generate spec for active file |
-| gitflow.generateClaudeMd | gitflow: Generate CLAUDE.md            |
-| gitflow.switchModel      | gitflow: Switch AI model               |
-| gitflow.auth             | gitflow: Setup or update API keys      |
-| gitflow.showPanel        | gitflow: Show gitflow panel            |
-| gitflow.status           | gitflow: Show status                   |
+| Command ID              | Label                                       |
+| ----------------------- | ------------------------------------------- |
+| gitpilot.commit         | gitpilot: Generate commit message           |
+| gitpilot.createPR       | gitpilot: Create PR with description        |
+| gitpilot.reviewPR       | gitpilot: Review current PR                 |
+| gitpilot.fixAllBlockers | gitpilot: Fix all blocker comments          |
+| gitpilot.fixComment     | gitpilot: Fix selected comment              |
+| gitpilot.switchModel    | gitpilot: Switch AI model                   |
+| gitpilot.auth           | gitpilot: Setup or update API keys          |
+| gitpilot.showPanel      | gitpilot: Show panel                        |
+| gitpilot.status         | gitpilot: Show status                       |
+| gitpilot.toggleMode     | gitpilot: Toggle between AI and Native Git  |
 
 ## Sidebar panel
 
-Registers a WebviewViewProvider in the VS Code sidebar showing:
+Registers a WebviewViewProvider in the VS Code sidebar showing a
+task-oriented UI (no pipeline state machine) with these sections:
 
-### Pipeline section
+### Manage Keys
 
-Shows each step with status indicator:
+- Shows current AI provider and whether the corresponding key is set.
+- Shows whether the platform token is configured.
+- "Manage API Keys" button → invokes the same flow as the
+  `gitpilot.auth` command.
 
-- ○ idle (gray dot)
-- ● running (blue dot, animated)
-- ✓ done (green dot)
-- ✗ failed (red dot)
+### Mode toggle
 
-Steps shown:
+- "gitpilot (AI)" / "Native Git" button group.
+- Persisted to `context.globalState` under `gitpilot.mode`.
+- In Native Git mode the AI generation buttons are hidden; the user
+  edits the commit message / PR title manually before submitting.
 
-1. Commit message
-2. PR created
-3. PR description
-4. PR review
-5. Fix comments
+### Commit
 
-### Review comments section
+- "Generate Commit Message" button → runs `gitpilot commit --dry-run`,
+  parses JSON `{message}`, fills the editable textarea.
+- Editable textarea, pre-filled with the generated message.
+- "Commit" button → runs `git commit -m "<edited>"` directly. Never
+  auto-commits the generated draft without the user pressing Commit.
 
-When a PR has been reviewed, shows each issue as a card:
+### Pull Request
 
-- Severity badge (blocker/warning/info)
-- File path and line number
-- Comment text
-- "Fix with gitflow" button
-- "Dismiss" button
+Visible when the repo has at least one commit but no open PR. Surfaces:
 
-### Spec tools section
+- Branch name + push state from `gitpilot status --json`.
+- "Generate PR title + description" → runs
+  `gitpilot pr create --dry-run`, fills editable fields.
+- Editable title input + description textarea.
+- "Create PR" → uses `gh pr create` to push the branch and open the PR.
 
-- "Generate CLAUDE.md" button
-- "Generate spec for active file" button
-- "Generate spec for existing component" button
+### Code Review
+
+Visible when the current branch has an open PR. Shows:
+
+- "Generate Code Review" button → runs `gitpilot review --json`.
+- The returned issues rendered as a list with severity, file:line, and
+  optional suggested fix. No empty-state card is rendered when there
+  are zero issues.
 
 ### Model switcher section
 
-Dropdown showing current provider + model.
-Options:
+Dropdown showing the current provider + model. Built-in options:
 
-- Claude Sonnet 4.6 (default)
-- Claude Opus 4.6
+- Claude Sonnet 4.6 (default, recommended)
+- Claude Opus 4.7
 - GPT-4o
-- Gemini 1.5 Pro
-- Ollama (local)
+- Gemini 2.5 Pro
+- Gemini 2.0 Flash
 
-Changing selection runs:
-npx gitflow config set ai.provider <provider> ai.model <model>
+Plus any models reported by a local Ollama daemon at
+`http://localhost:11434/api/tags`, deduped against the static list.
+
+Changing selection writes `ai.provider` and `ai.model` directly to
+`gitpilot.config.yml` via `js-yaml` (no CLI roundtrip), then notifies
+the webview with a `configUpdate` message.
 
 ## Extension host implementation
 
-### How commands work
+### Two CLI invocation paths
 
-Each command spawns a terminal and runs the CLI:
+The host calls the CLI in two different ways depending on whether the
+sidebar needs the data inline or wants the user to follow an interactive
+flow:
 
-```ts
-async function runCommand(command: string, args: string[] = []) {
-  const terminal = vscode.window.createTerminal("gitflow");
-  terminal.show();
-  terminal.sendText(`npx gitflow ${command} ${args.join(" ")}`);
-}
+1. **Captured stdout** (`execGitpilot(args)` → `child_process.execFile`)
+   used by `gitpilot commit --dry-run`, `gitpilot pr create --dry-run`,
+   `gitpilot review --json`, and `gitpilot status --json`. Output is
+   parsed as JSON and forwarded to the webview as a typed message.
+2. **Terminal** (`vscode.window.createTerminal({ name: "gitpilot" })`)
+   used by the palette commands so the user can answer interactive
+   prompts. The same terminal is reused for the `gh pr create` flow.
 
-vscode.commands.registerCommand("gitflow.commit", () => runCommand("commit"));
+### Mode handling
 
-vscode.commands.registerCommand("gitflow.createPR", () => runCommand("pr"));
+`globalState[gitpilot.mode]` holds either `"gitpilot"` or `"native"`
+(default `"gitpilot"`). When mode is `native` the sidebar's Generate
+buttons short-circuit — no AI call is made and the user fills the
+textarea manually before pressing Commit / Create PR. The
+`gitpilot.toggleMode` palette command flips the value and posts
+`modeUpdate` so the sidebar reflects the change immediately.
 
-vscode.commands.registerCommand("gitflow.reviewPR", async () => {
-  const prId = await vscode.window.showInputBox({
-    prompt: "PR number (leave empty for local diff review)",
-    placeHolder: "142",
-  });
-  runCommand("review", prId ? ["--pr", prId] : []);
-});
+### Webview ↔ host message protocol
 
-vscode.commands.registerCommand("gitflow.switchModel", async () => {
-  const model = await vscode.window.showQuickPick(
-    [
-      {
-        label: "Claude Sonnet 4.6",
-        detail: "Fast and smart — recommended",
-        provider: "claude",
-        model: "claude-sonnet-4-6",
-      },
-      {
-        label: "Claude Opus 4.6",
-        detail: "Most capable, slower",
-        provider: "claude",
-        model: "claude-opus-4-6",
-      },
-      {
-        label: "GPT-4o",
-        detail: "OpenAI — requires OPENAI_API_KEY",
-        provider: "openai",
-        model: "gpt-4o",
-      },
-      {
-        label: "Gemini 1.5 Pro",
-        detail: "Google — requires GEMINI_API_KEY",
-        provider: "gemini",
-        model: "gemini-1.5-pro",
-      },
-      {
-        label: "Ollama (local)",
-        detail: "Free, runs on your machine",
-        provider: "ollama",
-        model: "llama3",
-      },
-    ],
-    { placeHolder: "Select AI model" },
-  );
+Inbound (host → webview): `setupStatus`, `configUpdate`,
+`modelOptionsUpdate`, `commandRunning` / `commandDone` /
+`commandFailed`, `commitDraft`, `prDraft`, `reviewResult`,
+`repoStatus`, `modeUpdate`.
 
-  if (model) {
-    runCommand("config set", [
-      `ai.provider ${model.provider}`,
-      `ai.model ${model.model}`,
-    ]);
-    vscode.window.showInformationMessage(`gitflow: Switched to ${model.label}`);
-  }
-});
-```
+Outbound (webview → host): `requestState`, `setupKeys`, `switchModel`,
+`generateCommit`, `commitMessage`, `generatePr`, `createPr`,
+`runReview`, `setMode`, `refreshStatus`.
 
-### How the webview communicates with extension host
-
-```ts
-// Extension host sends data to webview
-panel.webview.postMessage({
-  type: "reviewComplete",
-  issues: [
-    { file: "src/auth.ts", line: 42, severity: "blocker", comment: "..." },
-  ],
-});
-
-// Webview sends actions back to extension host
-window.addEventListener("message", (event) => {
-  const message = event.data;
-  switch (message.type) {
-    case "fixComment":
-      runCommand("fix", ["--pr", message.prId, "--comment", message.commentId]);
-      break;
-    case "switchModel":
-      runCommand("config set", [`ai.model ${message.model}`]);
-      break;
-  }
-});
-```
+All payloads are validated with zod at both ends.
 
 ### Status bar item
 
 Shows at the bottom of VS Code:
 
-- "$(sync~spin) gitflow running..." during command execution
-- "$(check) gitflow ready" when idle
+- "$(sync~spin) gitpilot running..." during command execution
+- "$(check) gitpilot ready" when idle
 - "$(alert) 3 blockers" when review found issues
 - Clicking opens the sidebar panel
 
@@ -192,58 +144,50 @@ Shows at the bottom of VS Code:
 packages/webview/src/
 App.tsx ← root, receives messages from extension
 components/
-PipelineStatus.tsx ← shows each step with dot indicator
-ReviewCard.tsx ← one issue card with fix button
-ReviewCommentList.tsx ← list of all review cards
+ManageKeys.tsx ← key status + Manage button
+ModeToggle.tsx ← gitpilot / Native Git switch
+CommitPanel.tsx ← Generate / edit / commit
+PrPanel.tsx ← Generate / edit / create PR
+ReviewPanel.tsx ← Generate Code Review + issue list
 ModelSwitcher.tsx ← dropdown for AI model selection
-SpecTools.tsx ← generate spec/CLAUDE.md buttons
-hooks/
-useVSCodeMessages.ts ← listens for postMessage from extension
+SeverityBadge.tsx ← severity pill used in ReviewPanel
 
 ## package.json for extension
 
-```json
-{
-  "name": "gitflow-vscode",
-  "displayName": "gitflow",
-  "description": "AI-powered git workflow automation",
-  "version": "0.1.0",
-  "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other"],
-  "activationEvents": ["onStartupFinished"],
-  "main": "./dist/extension.js",
-  "contributes": {
-    "commands": [...],
-    "viewsContainers": {
-      "activitybar": [{
-        "id": "gitflow",
-        "title": "gitflow",
-        "icon": "$(source-control)"
-      }]
-    },
-    "views": {
-      "gitflow": [{
-        "type": "webview",
-        "id": "gitflow.panel",
-        "name": "gitflow"
-      }]
-    }
-  }
-}
-```
+The shipped manifest declares:
+
+- `name`: `gitpilot`, `displayName`: `gitpilot`, `publisher`: `atsharma`.
+- `categories`: `["SCM Providers", "AI", "Other"]`.
+- `activationEvents`: `["onStartupFinished"]`.
+- `keywords`: git, ai, commit, pull request, code review, claude, openai,
+  gemini, ollama, conventional commits.
+- `contributes.commands`: every command listed above is registered as a
+  `gitpilot.*` command with `category: "gitpilot"`.
+- `contributes.viewsContainers.activitybar`: a single `gitpilot` container
+  using `media/activity-bar.png`.
+- `contributes.views.gitpilot`: one webview view `gitpilot.panel` titled
+  "gitpilot".
+- `contributes.menus.scm/title`: surfaces `gitpilot.commit` from the
+  Source Control title bar when the active provider is git.
+- `contributes.menus.view/title`: surfaces `gitpilot.toggleMode` and
+  `gitpilot.auth` in the gitpilot panel header.
+- `contributes.configuration`:
+  - `gitpilot.defaultMode`: `"gitpilot" | "native"` (default `gitpilot`).
+  - `gitpilot.cliCommand`: command used to invoke the CLI (default
+    `npx gitpilot`).
 
 ## API key management
 
-Inside VS Code the user never runs `gitflow auth`. The extension owns the
+Inside VS Code the user never runs `gitpilot auth`. The extension owns the
 secret-setup UX:
 
 - On first activation per VS Code profile, the extension prompts the user
-  to set up API keys. A `gitflow.firstLaunchComplete` flag in
+  to set up API keys. A `gitpilot.firstLaunchComplete` flag in
   `context.globalState` ensures this runs once.
-- The `gitflow.auth` command opens the same flow and can be re-run any
+- The `gitpilot.auth` command opens the same flow and can be re-run any
   time to set, update, or clear keys.
 - Keys are written to the OS keychain via `keytar` under the service name
-  `gitflow`, using the same account names (`ANTHROPIC_API_KEY`,
+  `gitpilot`, using the same account names (`ANTHROPIC_API_KEY`,
   `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GITHUB_TOKEN`, `AZURE_DEVOPS_PAT`,
   `GITLAB_TOKEN`) that `core/secrets` reads. CLI subprocesses spawned
   from the extension's terminal therefore see the keys without any
@@ -258,19 +202,30 @@ secret-setup UX:
 - Extension activates on startup (onStartupFinished)
 - All commands available in command palette
 - Status bar always visible when extension active
-- Model switcher reads current model from gitflow.config.yml on open
+- Model switcher reads current model from gitpilot.config.yml on open
 - Fix button in webview passes exact commentId to CLI
 - API keys are configured inside VS Code (first-launch prompt or
-  `gitflow.auth`), never by asking the user to run `gitflow auth` in a
+  `gitpilot.auth`), never by asking the user to run `gitpilot auth` in a
   terminal
 
 ## Tests required
 
-- Each command spawns terminal with correct CLI command
-- switchModel quick pick shows all five options
-- switchModel runs config set with correct provider and model
-- reviewPR passes --pr flag when PR number entered
-- reviewPR runs without --pr when input box cancelled
-- Webview postMessage fixComment triggers fix command
-- Status bar shows running during command execution
-- Status bar shows blocker count after review
+- Palette commands spawn a terminal with the correct CLI invocation.
+- `gitpilot.toggleMode` flips `globalState[gitpilot.mode]` between
+  `gitpilot` and `native` and posts `modeUpdate` to the webview.
+- `switchModel` quick pick shows every option in `MODEL_OPTIONS` plus any
+  models discovered via the local Ollama tags endpoint.
+- `switchModel` writes the provider + model into `gitpilot.config.yml`.
+- `reviewPR` passes `--pr <id>` when a PR number is entered, and runs
+  without the flag when the input box is cancelled.
+- Webview `generateCommit` causes the host to run `gitpilot commit
+  --dry-run` and post `commitDraft` with the parsed message.
+- Webview `commitMessage` triggers a `git commit -m "<msg>"` and only
+  on success does the host post `commandDone` and a refreshed
+  `repoStatus`.
+- Webview `generatePr` runs `gitpilot pr create --dry-run` and posts
+  `prDraft` with the parsed `{title, description}`.
+- Webview `runReview` runs `gitpilot review --json` and posts
+  `reviewResult` with parsed issues; an empty array emits no UI card.
+- Status bar shows the running indicator while any host action is in
+  flight and resets to "ready" afterwards.

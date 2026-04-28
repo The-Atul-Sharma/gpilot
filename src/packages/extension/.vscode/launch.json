@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "configurations": [
     {
-      "name": "Run gitflow extension (local)",
+      "name": "Run gitpilot extension (local)",
       "type": "extensionHost",
       "request": "launch",
       "args": ["--extensionDevelopmentPath=${workspaceFolder}"],

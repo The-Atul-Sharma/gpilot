@@ -1,19 +1,34 @@
 {
-  "name": "gitflow",
-  "displayName": "gitflow",
-  "description": "AI-powered git workflow automation",
+  "name": "gitpilot",
+  "displayName": "gitpilot",
+  "description": "AI-powered git workflow inside VS Code: generate commits, create PRs with descriptions, and run AI code reviews — all from a task-oriented sidebar.",
   "version": "1.0.0",
   "publisher": "atsharma",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=24.0.0"
   },
   "categories": [
+    "SCM Providers",
+    "AI",
     "Other"
+  ],
+  "keywords": [
+    "git",
+    "ai",
+    "commit",
+    "pull request",
+    "code review",
+    "claude",
+    "openai",
+    "gemini",
+    "ollama",
+    "conventional commits"
   ],
   "icon": "media/icon.png",
   "activationEvents": [
-    "*"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "scripts": {
@@ -25,59 +40,113 @@
   "contributes": {
     "commands": [
       {
-        "command": "gitflow.commit",
-        "title": "gitflow: Generate commit message"
+        "command": "gitpilot.commit",
+        "title": "gitpilot: Generate commit message",
+        "category": "gitpilot"
       },
       {
-        "command": "gitflow.createPR",
-        "title": "gitflow: Create PR with description"
+        "command": "gitpilot.createPR",
+        "title": "gitpilot: Create PR with description",
+        "category": "gitpilot"
       },
       {
-        "command": "gitflow.reviewPR",
-        "title": "gitflow: Review current PR"
+        "command": "gitpilot.reviewPR",
+        "title": "gitpilot: Review current PR",
+        "category": "gitpilot"
       },
       {
-        "command": "gitflow.fixAllBlockers",
-        "title": "gitflow: Fix all blocker comments"
+        "command": "gitpilot.fixAllBlockers",
+        "title": "gitpilot: Fix all blocker comments",
+        "category": "gitpilot"
       },
       {
-        "command": "gitflow.fixComment",
-        "title": "gitflow: Fix selected comment"
+        "command": "gitpilot.fixComment",
+        "title": "gitpilot: Fix selected comment",
+        "category": "gitpilot"
       },
       {
-        "command": "gitflow.switchModel",
-        "title": "gitflow: Switch AI model"
+        "command": "gitpilot.switchModel",
+        "title": "gitpilot: Switch AI model",
+        "category": "gitpilot"
       },
       {
-        "command": "gitflow.auth",
-        "title": "gitflow: Setup or update API keys"
+        "command": "gitpilot.auth",
+        "title": "gitpilot: Setup or update API keys",
+        "category": "gitpilot"
       },
       {
-        "command": "gitflow.showPanel",
-        "title": "gitflow: Show gitflow panel"
+        "command": "gitpilot.showPanel",
+        "title": "gitpilot: Show panel",
+        "category": "gitpilot"
       },
       {
-        "command": "gitflow.status",
-        "title": "gitflow: Show status"
+        "command": "gitpilot.status",
+        "title": "gitpilot: Show status",
+        "category": "gitpilot"
+      },
+      {
+        "command": "gitpilot.toggleMode",
+        "title": "gitpilot: Toggle between AI and Native Git",
+        "category": "gitpilot"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "gitflow",
-          "title": "gitflow",
+          "id": "gitpilot",
+          "title": "gitpilot",
           "icon": "media/activity-bar.png"
         }
       ]
     },
     "views": {
-      "gitflow": [
+      "gitpilot": [
         {
           "type": "webview",
-          "id": "gitflow.panel",
-          "name": "gitflow"
+          "id": "gitpilot.panel",
+          "name": "gitpilot"
         }
       ]
+    },
+    "menus": {
+      "scm/title": [
+        {
+          "command": "gitpilot.commit",
+          "group": "navigation",
+          "when": "scmProvider == git"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "gitpilot.toggleMode",
+          "when": "view == gitpilot.panel",
+          "group": "navigation"
+        },
+        {
+          "command": "gitpilot.auth",
+          "when": "view == gitpilot.panel",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "gitpilot",
+      "properties": {
+        "gitpilot.defaultMode": {
+          "type": "string",
+          "enum": [
+            "gitpilot",
+            "native"
+          ],
+          "default": "gitpilot",
+          "description": "Default sidebar mode on first activation. 'gitpilot' uses AI for commit and PR text; 'native' falls back to manual git commands."
+        },
+        "gitpilot.cliCommand": {
+          "type": "string",
+          "default": "npx gitpilot",
+          "description": "Command used to invoke the gitpilot CLI from the extension. Override if gitpilot is installed under a different name or path."
+        }
+      }
     }
   },
   "dependencies": {
