@@ -38,11 +38,16 @@ export function ModelSwitcher({
   };
 
   return (
-    <section style={layout.section} aria-label="AI Model">
-      <h2 style={layout.sectionTitle}>AI Model</h2>
+    <section aria-label="AI Model">
       <select
         aria-label="Select AI model"
-        style={layout.select}
+        style={{
+          ...layout.select,
+          width: 180,
+          fontWeight: 600,
+          fontSize: 12,
+          background: "#21262d",
+        }}
         value={value}
         onChange={handleChange}
       >

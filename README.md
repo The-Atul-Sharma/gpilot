@@ -1,4 +1,4 @@
-# 🚀 gitpilot
+# 🚀 GitPilot
 
 [![npm version](https://img.shields.io/npm/v/gitpilot.svg)](https://www.npmjs.com/package/gitpilot)
 [![npm downloads](https://img.shields.io/npm/dw/gitpilot.svg)](https://www.npmjs.com/package/gitpilot)

@@ -702,6 +702,41 @@ async function detectHasCommit(cwd: string): Promise<boolean> {
   }
 }
 
+async function listWorkingTreeFiles(
+  cwd: string,
+): Promise<
+  Array<{
+    status: string;
+    path: string;
+    staged: boolean;
+    unstaged: boolean;
+  }>
+> {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["status", "--short", "--untracked-files=all"],
+      { cwd, maxBuffer: 50 * 1024 * 1024 },
+    );
+    return stdout
+      .split("\n")
+      .map((line) => line.trimEnd())
+      .filter((line) => line.length > 3)
+      .map((line) => {
+        const indexStatus = line[0] ?? " ";
+        const worktreeStatus = line[1] ?? " ";
+        return {
+          status: line.slice(0, 2).trim() || "?",
+          path: line.slice(3).trim(),
+          staged: indexStatus !== " " && indexStatus !== "?",
+          unstaged: worktreeStatus !== " " || line.startsWith("??"),
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
 async function runStatus(
   config: gitpilotConfig,
   cwd: string,
@@ -741,6 +776,7 @@ async function runStatus(
   const hasOpenPR = isBranchPushed
     ? await detectHasOpenPR(config, git, secrets, currentBranch)
     : false;
+  const changedFiles = await listWorkingTreeFiles(cwd);
 
   if (jsonOutput) {
     process.stdout.write(
@@ -758,6 +794,7 @@ async function runStatus(
         hasCommit,
         isBranchPushed,
         hasOpenPR,
+        changedFiles,
         hooksInstalled,
       })}\n`,
     );

@@ -1,5 +1,3 @@
-import { layout } from '../styles.js';
-
 interface ManageKeysProps {
   provider: string;
   aiConfigured: boolean;
@@ -25,22 +23,24 @@ export function ManageKeys({
     ? 'No key required'
     : aiConfigured ? 'connected' : 'missing';
   return (
-    <section style={layout.section} aria-label="Manage Keys">
-      <h2 style={layout.sectionTitle}>API Keys</h2>
-      <div style={layout.card}>
-        <div style={{ fontSize: 12, opacity: 0.85 }}>
-          <div>
-            Provider: <strong>{providerLabel}</strong> — {aiLabel}
-          </div>
-          <div>
-            Platform token: {platformConfigured ? 'connected' : 'missing'}
-          </div>
-        </div>
-        <div>
-          <button style={layout.primaryButton} type="button" onClick={onManage}>
-            Manage API Keys
-          </button>
-        </div>
+    <section aria-label="Manage Keys">
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, opacity: 0.72, paddingTop: 2 }}>
+        <span>{provider === "ollama" ? "Ollama local mode" : `${providerLabel} ${aiLabel}`}</span>
+        <button
+          type="button"
+          onClick={onManage}
+          style={{
+            border: "none",
+            background: "transparent",
+            color: platformConfigured ? "#e7eaee" : "#6eb7ff",
+            cursor: "pointer",
+            padding: 0,
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
+          Manage API Keys
+        </button>
       </div>
     </section>
   );

@@ -1,4 +1,4 @@
-# gitpilot
+# GitPilot
 
 AI-powered git workflow inside VS Code. Generate commit messages, create
 pull requests with AI descriptions, and run AI code reviews — all from a
@@ -35,8 +35,8 @@ for a review panel:
 
 - **Generate Code Review** — runs `gitpilot review --json`.
 - Each issue is rendered with severity (blocker / warning / info), file
-  + line, comment text, and the optional suggested fix. No empty-state
-  card is rendered when there are zero issues.
+  - line, comment text, and the optional suggested fix. No empty-state
+    card is rendered when there are zero issues.
 
 ### Mode toggle
 
@@ -66,25 +66,25 @@ The selection is written into `gitpilot.config.yml`.
 
 ## Commands
 
-| Command                                       | What it does                                            |
-| --------------------------------------------- | ------------------------------------------------------- |
-| `gitpilot: Generate commit message`           | Runs `gitpilot commit` in a terminal                    |
-| `gitpilot: Create PR with description`        | Runs `gitpilot pr` in a terminal                        |
-| `gitpilot: Review current PR`                 | Prompts for PR id then runs `gitpilot review`           |
-| `gitpilot: Fix all blocker comments`          | Runs `gitpilot fix --all`                               |
-| `gitpilot: Fix selected comment`              | Runs `gitpilot fix --pr <id> --comment <id>`            |
-| `gitpilot: Switch AI model`                   | Quick-pick that updates `gitpilot.config.yml`           |
-| `gitpilot: Setup or update API keys`          | Opens the keychain manager                              |
-| `gitpilot: Show panel`                        | Focuses the sidebar                                     |
-| `gitpilot: Show status`                       | Runs `gitpilot status` in a terminal                    |
-| `gitpilot: Toggle between AI and Native Git`  | Flips the sidebar mode                                  |
+| Command                                      | What it does                                  |
+| -------------------------------------------- | --------------------------------------------- |
+| `gitpilot: Generate commit message`          | Runs `gitpilot commit` in a terminal          |
+| `gitpilot: Create PR with description`       | Runs `gitpilot pr` in a terminal              |
+| `gitpilot: Review current PR`                | Prompts for PR id then runs `gitpilot review` |
+| `gitpilot: Fix all blocker comments`         | Runs `gitpilot fix --all`                     |
+| `gitpilot: Fix selected comment`             | Runs `gitpilot fix --pr <id> --comment <id>`  |
+| `gitpilot: Switch AI model`                  | Quick-pick that updates `gitpilot.config.yml` |
+| `gitpilot: Setup or update API keys`         | Opens the keychain manager                    |
+| `gitpilot: Show panel`                       | Focuses the sidebar                           |
+| `gitpilot: Show status`                      | Runs `gitpilot status` in a terminal          |
+| `gitpilot: Toggle between AI and Native Git` | Flips the sidebar mode                        |
 
 ## Settings
 
-| Setting                | Default          | Description                                     |
-| ---------------------- | ---------------- | ----------------------------------------------- |
-| `gitpilot.defaultMode` | `gitpilot`       | `"gitpilot"` (AI) or `"native"` (manual)        |
-| `gitpilot.cliCommand`  | `npx gitpilot`   | Override if `gitpilot` is installed differently |
+| Setting                | Default        | Description                                     |
+| ---------------------- | -------------- | ----------------------------------------------- |
+| `gitpilot.defaultMode` | `gitpilot`     | `"gitpilot"` (AI) or `"native"` (manual)        |
+| `gitpilot.cliCommand`  | `npx gitpilot` | Override if `gitpilot` is installed differently |
 
 ## Requirements
 

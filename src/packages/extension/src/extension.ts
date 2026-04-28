@@ -34,6 +34,12 @@ export interface RepoStatus {
   hasCommit: boolean;
   isBranchPushed: boolean;
   hasOpenPR: boolean;
+  changedFiles: Array<{
+    status: string;
+    path: string;
+    staged: boolean;
+    unstaged: boolean;
+  }>;
 }
 
 export interface ExtensionMessageFromWebview {
@@ -47,6 +53,10 @@ export interface ExtensionMessageFromWebview {
     | "generatePr"
     | "createPr"
     | "runReview"
+    | "openWorkingTree"
+    | "openFileDiff"
+    | "stageFile"
+    | "unstageFile"
     | "setMode"
     | "refreshStatus";
   provider?: string;
@@ -55,6 +65,7 @@ export interface ExtensionMessageFromWebview {
   title?: string;
   description?: string;
   mode?: gitpilotMode;
+  path?: string;
 }
 
 export interface ExtensionMessageToWebview {
@@ -284,7 +295,9 @@ export async function promptForSecret(
   return true;
 }
 
-export async function manageApiKeys(): Promise<void> {
+export async function manageApiKeys(
+  onUpdated?: () => Promise<void> | void,
+): Promise<void> {
   while (true) {
     const items: Array<
       vscode.QuickPickItem & { descriptor?: SecretDescriptor; action?: "clear" }
@@ -307,16 +320,22 @@ export async function manageApiKeys(): Promise<void> {
     if (!picked) return;
 
     if (picked.action === "clear") {
-      await clearSecretFlow();
+      const changed = await clearSecretFlow();
+      if (changed) {
+        await onUpdated?.();
+      }
       continue;
     }
     if (picked.descriptor) {
-      await promptForSecret(picked.descriptor);
+      const changed = await promptForSecret(picked.descriptor);
+      if (changed) {
+        await onUpdated?.();
+      }
     }
   }
 }
 
-async function clearSecretFlow(): Promise<void> {
+async function clearSecretFlow(): Promise<boolean> {
   const items: Array<vscode.QuickPickItem & { descriptor: SecretDescriptor }> =
     [];
   for (const d of SECRET_DESCRIPTORS) {
@@ -328,17 +347,18 @@ async function clearSecretFlow(): Promise<void> {
     await vscode.window.showInformationMessage(
       "gitpilot: No saved keys to clear.",
     );
-    return;
+    return false;
   }
   const picked = await vscode.window.showQuickPick(items, {
     placeHolder: "Select a key to remove from the keychain",
     ignoreFocusOut: true,
   });
-  if (!picked) return;
+  if (!picked) return false;
   await deleteSecret(picked.descriptor.key);
   await vscode.window.showInformationMessage(
     `gitpilot: Cleared ${picked.descriptor.label}.`,
   );
+  return true;
 }
 
 export async function runFirstLaunchSetupIfNeeded(
@@ -346,6 +366,11 @@ export async function runFirstLaunchSetupIfNeeded(
 ): Promise<void> {
   const done = context.globalState.get<boolean>(FIRST_LAUNCH_STATE_KEY);
   if (done) return;
+  const mode = context.globalState.get<gitpilotMode>(MODE_STATE_KEY) ?? "gitpilot";
+  if (mode === "native") {
+    await context.globalState.update(FIRST_LAUNCH_STATE_KEY, true);
+    return;
+  }
   const aiConfigured =
     (await hasSecret("ANTHROPIC_API_KEY")) ||
     (await hasSecret("OPENAI_API_KEY")) ||
@@ -354,7 +379,12 @@ export async function runFirstLaunchSetupIfNeeded(
     (await hasSecret("GITHUB_TOKEN")) ||
     (await hasSecret("AZURE_DEVOPS_PAT")) ||
     (await hasSecret("GITLAB_TOKEN"));
-  if (aiConfigured && platformConfigured) {
+  const root = workspaceRoot();
+  const current = root ? await readCurrentModel(root) : null;
+  const provider = current?.provider ?? "claude";
+  const ready =
+    provider === "ollama" ? platformConfigured : aiConfigured && platformConfigured;
+  if (ready) {
     await context.globalState.update(FIRST_LAUNCH_STATE_KEY, true);
     return;
   }
@@ -374,7 +404,13 @@ export async function runFirstLaunchSetupIfNeeded(
       (await hasSecret("GITHUB_TOKEN")) ||
       (await hasSecret("AZURE_DEVOPS_PAT")) ||
       (await hasSecret("GITLAB_TOKEN"));
-    if (aiConfiguredAfterSetup && platformConfiguredAfterSetup) {
+    const currentAfterSetup = root ? await readCurrentModel(root) : null;
+    const providerAfterSetup = currentAfterSetup?.provider ?? provider;
+    const readyAfterSetup =
+      providerAfterSetup === "ollama"
+        ? platformConfiguredAfterSetup
+        : aiConfiguredAfterSetup && platformConfiguredAfterSetup;
+    if (readyAfterSetup) {
       await context.globalState.update(FIRST_LAUNCH_STATE_KEY, true);
     }
     return;
@@ -428,6 +464,59 @@ async function runShellCommand(command: string): Promise<void> {
   terminal.sendText(command);
 }
 
+function workspaceFileUri(path: string): vscode.Uri {
+  const root = workspaceRoot();
+  if (!root) {
+    throw new ExtensionError("Open a workspace folder first.");
+  }
+  return vscode.Uri.file(join(root, path));
+}
+
+async function openFileDiff(path: string): Promise<void> {
+  if (!path || !path.trim()) {
+    throw new ExtensionError("openFileDiff requires a file path.");
+  }
+  const fileUri = workspaceFileUri(path);
+  try {
+    await vscode.commands.executeCommand("git.viewChanges", fileUri);
+  } catch {
+    try {
+      await vscode.commands.executeCommand("git.openChange", fileUri);
+    } catch {
+      const doc = await vscode.workspace.openTextDocument(fileUri);
+      await vscode.window.showTextDocument(doc, { preview: false });
+    }
+  }
+}
+
+async function stageFile(path: string): Promise<void> {
+  if (!path || !path.trim()) {
+    throw new ExtensionError("stageFile requires a file path.");
+  }
+  const root = workspaceRoot();
+  if (!root) {
+    throw new ExtensionError("Open a workspace folder before staging.");
+  }
+  await execFileAsync("git", ["add", "--", path], {
+    cwd: root,
+    maxBuffer: 50 * 1024 * 1024,
+  });
+}
+
+async function unstageFile(path: string): Promise<void> {
+  if (!path || !path.trim()) {
+    throw new ExtensionError("unstageFile requires a file path.");
+  }
+  const root = workspaceRoot();
+  if (!root) {
+    throw new ExtensionError("Open a workspace folder before unstaging.");
+  }
+  await execFileAsync("git", ["reset", "HEAD", "--", path], {
+    cwd: root,
+    maxBuffer: 50 * 1024 * 1024,
+  });
+}
+
 const commitDryRunSchema = z.object({ message: z.string() });
 const prDryRunSchema = z.object({
   title: z.string(),
@@ -448,6 +537,14 @@ const statusJsonSchema = z.object({
   hasCommit: z.boolean(),
   isBranchPushed: z.boolean(),
   hasOpenPR: z.boolean(),
+  changedFiles: z.array(
+    z.object({
+      status: z.string().min(1),
+      path: z.string().min(1),
+      staged: z.boolean().default(false),
+      unstaged: z.boolean().default(false),
+    }),
+  ),
 });
 
 function lastJsonLine(stdout: string): string {
@@ -526,6 +623,7 @@ export async function fetchRepoStatus(): Promise<RepoStatus> {
       hasCommit: result.hasCommit,
       isBranchPushed: result.isBranchPushed,
       hasOpenPR: result.hasOpenPR,
+      changedFiles: result.changedFiles,
     };
   } catch {
     return {
@@ -533,6 +631,7 @@ export async function fetchRepoStatus(): Promise<RepoStatus> {
       hasCommit: false,
       isBranchPushed: false,
       hasOpenPR: false,
+      changedFiles: [],
     };
   }
 }
@@ -620,6 +719,19 @@ function resolveWebviewDistUri(
   return candidates.find((candidate) => existsSync(candidate.fsPath));
 }
 
+function resolveCodiconDistUri(
+  extensionUri: vscode.Uri,
+): vscode.Uri | undefined {
+  const candidates = [
+    vscode.Uri.joinPath(extensionUri, "node_modules", "@vscode", "codicons", "dist"),
+    vscode.Uri.joinPath(extensionUri, "..", "node_modules", "@vscode", "codicons", "dist"),
+    vscode.Uri.joinPath(extensionUri, "..", "..", "..", "node_modules", "@vscode", "codicons", "dist"),
+  ];
+  return candidates.find((candidate) =>
+    existsSync(join(candidate.fsPath, "codicon.css")),
+  );
+}
+
 export class gitpilotSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = VIEW_ID;
 
@@ -632,6 +744,7 @@ export class gitpilotSidebarProvider implements vscode.WebviewViewProvider {
   ) {}
 
   private async postSetupStatus(): Promise<void> {
+    const mode = this.currentMode();
     const aiConfigured =
       (await hasSecret("ANTHROPIC_API_KEY")) ||
       (await hasSecret("OPENAI_API_KEY")) ||
@@ -640,11 +753,19 @@ export class gitpilotSidebarProvider implements vscode.WebviewViewProvider {
       (await hasSecret("GITHUB_TOKEN")) ||
       (await hasSecret("AZURE_DEVOPS_PAT")) ||
       (await hasSecret("GITLAB_TOKEN"));
+    const root = workspaceRoot();
+    const current = root ? await readCurrentModel(root) : null;
+    const provider = current?.provider ?? "claude";
+    const ready =
+      mode === "native"
+        ? true
+        :
+      provider === "ollama" ? platformConfigured : aiConfigured && platformConfigured;
     this.post({
       type: "setupStatus",
       aiConfigured,
       platformConfigured,
-      ready: aiConfigured && platformConfigured,
+      ready,
     });
   }
 
@@ -655,15 +776,21 @@ export class gitpilotSidebarProvider implements vscode.WebviewViewProvider {
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this.view = webviewView;
     const webviewDistUri = resolveWebviewDistUri(this.extensionUri);
+    const codiconDistUri = resolveCodiconDistUri(this.extensionUri);
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: webviewDistUri
-        ? [this.extensionUri, webviewDistUri]
-        : [this.extensionUri],
+        ? codiconDistUri
+          ? [this.extensionUri, webviewDistUri, codiconDistUri]
+          : [this.extensionUri, webviewDistUri]
+        : codiconDistUri
+          ? [this.extensionUri, codiconDistUri]
+          : [this.extensionUri],
     };
     webviewView.webview.html = this.renderHtml(
       webviewView.webview,
       webviewDistUri,
+      codiconDistUri,
     );
     webviewView.webview.onDidReceiveMessage(
       (message: ExtensionMessageFromWebview) => {
@@ -755,6 +882,32 @@ export class gitpilotSidebarProvider implements vscode.WebviewViewProvider {
         });
         return;
       }
+      case "openWorkingTree": {
+        await this.runWithStatus("workingTree", async () => {
+          await runShellCommand("git status && git diff");
+        });
+        return;
+      }
+      case "openFileDiff": {
+        await this.runWithStatus("workingTree", async () => {
+          await openFileDiff(message.path ?? "");
+        });
+        return;
+      }
+      case "stageFile": {
+        await this.runWithStatus("workingTree", async () => {
+          await stageFile(message.path ?? "");
+          await this.postRepoStatus();
+        });
+        return;
+      }
+      case "unstageFile": {
+        await this.runWithStatus("workingTree", async () => {
+          await unstageFile(message.path ?? "");
+          await this.postRepoStatus();
+        });
+        return;
+      }
       case "switchModel": {
         if (!message.provider || !message.model) {
           throw new ExtensionError(
@@ -772,6 +925,7 @@ export class gitpilotSidebarProvider implements vscode.WebviewViewProvider {
           `gitpilot: Switched model to ${message.provider}/${message.model}.`,
         );
         this.notifyModelChanged(message.provider, message.model);
+        await this.postSetupStatus();
         return;
       }
       case "setMode": {
@@ -782,14 +936,19 @@ export class gitpilotSidebarProvider implements vscode.WebviewViewProvider {
         }
         await this.context.globalState.update(MODE_STATE_KEY, message.mode);
         this.post({ type: "modeUpdate", mode: message.mode });
+        await this.postSetupStatus();
         return;
       }
       case "showPanel":
         await vscode.commands.executeCommand(`${VIEW_ID}.focus`);
         return;
       case "setupKeys":
-        await manageApiKeys();
-        await this.postSetupStatus();
+        await this.runWithStatus("setup", async () => {
+          await manageApiKeys(async () => {
+            await this.postSetupStatus();
+          });
+          await this.postSetupStatus();
+        });
         return;
       case "refreshStatus":
         await this.postRepoStatus();
@@ -862,6 +1021,7 @@ export class gitpilotSidebarProvider implements vscode.WebviewViewProvider {
   private renderHtml(
     webview: vscode.Webview,
     webviewDistUri?: vscode.Uri,
+    codiconDistUri?: vscode.Uri,
   ): string {
     const scriptUri = webviewDistUri
       ? webview
@@ -871,6 +1031,11 @@ export class gitpilotSidebarProvider implements vscode.WebviewViewProvider {
           .toString()
       : "";
     const csp = `default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource};`;
+    const codiconCssUri = codiconDistUri
+      ? webview
+          .asWebviewUri(vscode.Uri.joinPath(codiconDistUri, "codicon.css"))
+          .toString()
+      : "";
     const missingBundleNotice = webviewDistUri
       ? ""
       : '<p style="padding:12px;">Webview bundle not found. Run: npm run build in src/packages/extension.</p>';
@@ -880,8 +1045,9 @@ export class gitpilotSidebarProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="${csp}" />
   <title>gitpilot</title>
+  ${codiconCssUri ? `<link href="${codiconCssUri}" rel="stylesheet" />` : ""}
 </head>
-<body>
+<body style="margin:0;padding:0;background:transparent;">
   <div id="root"></div>
   ${missingBundleNotice}
   ${scriptUri ? `<script type="module" src="${scriptUri}"></script>` : ""}

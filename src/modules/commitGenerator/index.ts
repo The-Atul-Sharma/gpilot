@@ -312,12 +312,11 @@ export function createCommitGenerator(input: CommitGeneratorInput): {
             requiredScope,
           ),
         );
-        validateMessage(message);
-
         if (mode === "dryrun") {
           await confirmation.ask({ mode, preview: message });
           return { status: "dryrun", message };
         }
+        validateMessage(message);
 
         const result: ConfirmResult = await confirmation.ask({
           mode,

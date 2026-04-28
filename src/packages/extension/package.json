@@ -1,6 +1,6 @@
 {
   "name": "gitpilot",
-  "displayName": "gitpilot",
+  "displayName": "GitPilot",
   "description": "AI-powered git workflow inside VS Code: generate commits, create PRs with descriptions, and run AI code reviews — all from a task-oriented sidebar.",
   "version": "1.0.0",
   "publisher": "atsharma",
@@ -116,18 +116,7 @@
           "when": "scmProvider == git"
         }
       ],
-      "view/title": [
-        {
-          "command": "gitpilot.toggleMode",
-          "when": "view == gitpilot.panel",
-          "group": "navigation"
-        },
-        {
-          "command": "gitpilot.auth",
-          "when": "view == gitpilot.panel",
-          "group": "navigation"
-        }
-      ]
+      "view/title": []
     },
     "configuration": {
       "title": "gitpilot",

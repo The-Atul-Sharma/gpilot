@@ -10,22 +10,32 @@ export function ModeToggle({ mode, onChange }: ModeToggleProps) {
   const isgitpilot = mode === "gitpilot";
   const buttonStyle = (active: boolean) => ({
     ...layout.secondaryButton,
-    background: active ? "var(--vscode-button-background)" : "transparent",
-    color: active
-      ? "var(--vscode-button-foreground)"
-      : "var(--vscode-editor-foreground)",
+    flex: 1,
+    borderRadius: 8,
+    border: active ? "1px solid rgba(44,156,255,0.65)" : "1px solid transparent",
+    background: active ? "linear-gradient(180deg, #1492e8, #0a84d6)" : "transparent",
+    color: active ? "#ffffff" : "rgba(231,234,238,0.72)",
+    fontWeight: active ? 700 : 600,
   });
   return (
-    <section style={layout.section} aria-label="Mode">
-      <h2 style={layout.sectionTitle}>Mode</h2>
-      <div role="group" style={{ display: "flex", gap: 6 }}>
+    <section aria-label="Mode">
+      <div
+        style={{
+          display: "flex",
+          gap: 4,
+          background: "#1c2025",
+          border: "1px solid rgba(255,255,255,0.12)",
+          borderRadius: 10,
+          padding: 4,
+        }}
+      >
         <button
           type="button"
           style={buttonStyle(isgitpilot)}
           aria-pressed={isgitpilot}
           onClick={() => onChange("gitpilot")}
         >
-          gitpilot (AI)
+          ✦ AI Mode
         </button>
         <button
           type="button"
@@ -33,7 +43,7 @@ export function ModeToggle({ mode, onChange }: ModeToggleProps) {
           aria-pressed={!isgitpilot}
           onClick={() => onChange("native")}
         >
-          Native Git
+          ⎇ Native Git
         </button>
       </div>
     </section>

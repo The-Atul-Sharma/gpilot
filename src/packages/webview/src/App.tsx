@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   ExtensionMessage,
   gitpilotMode,
@@ -15,6 +15,7 @@ import { PrPanel } from "./components/PrPanel.js";
 import { ReviewPanel } from "./components/ReviewPanel.js";
 import { ModeToggle } from "./components/ModeToggle.js";
 import { ModelSwitcher } from "./components/ModelSwitcher.js";
+type MainTab = "commit" | "pr" | "review";
 
 interface CurrentModel {
   provider: string;
@@ -37,6 +38,7 @@ const DEFAULT_STATUS: RepoStatus = {
   hasCommit: false,
   isBranchPushed: false,
   hasOpenPR: false,
+  changedFiles: [],
 };
 
 export function App() {
@@ -60,6 +62,7 @@ export function App() {
     description: "",
   });
   const [issues, setIssues] = useState<InlineIssue[]>([]);
+  const [activeTab, setActiveTab] = useState<MainTab>("commit");
 
   useEffect(() => {
     const onMessage = (event: MessageEvent): void => {
@@ -161,105 +164,279 @@ export function App() {
     sendMessage({ type: "runReview" });
   }
 
-  if (!ready) {
-    return (
-      <div style={layout.app}>
-        <section style={layout.section} aria-label="Setup Required">
-          <h2 style={layout.sectionTitle}>Setup Required</h2>
-          <div style={layout.card}>
-            <p style={{ margin: 0 }}>
-              Set at least one AI key and one platform key before using the
-              panel.
-            </p>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-                fontSize: 12,
-                opacity: 0.8,
-              }}
-            >
-              <span>AI key: {aiConfigured ? "configured" : "missing"}</span>
-              <span>
-                Platform key: {platformConfigured ? "configured" : "missing"}
-              </span>
-            </div>
-            <div>
-              <button
-                style={layout.primaryButton}
-                onClick={handleSetupKeys}
-                type="button"
-              >
-                Setup keys
-              </button>
-            </div>
-          </div>
-        </section>
-      </div>
-    );
+  function handleOpenFileDiff(path: string): void {
+    sendMessage({ type: "openFileDiff", path });
   }
 
+  function handleStageFile(path: string): void {
+    sendMessage({ type: "stageFile", path });
+  }
+
+  function handleUnstageFile(path: string): void {
+    sendMessage({ type: "unstageFile", path });
+  }
+
+  useEffect(() => {
+    if (
+      activeTab === "review" &&
+      !(mode === "gitpilot" && repoStatus.hasOpenPR)
+    ) {
+      setActiveTab("pr");
+    }
+  }, [activeTab, mode, repoStatus.hasOpenPR]);
+
+  const needsSetup = !ready;
+
+  const statusLabel = needsSetup
+    ? "Setup Required"
+    : runningCommand
+      ? "Running..."
+      : "Ready";
+  const statusColor = needsSetup
+    ? "#f9a34b"
+    : runningCommand
+      ? "#34a8ff"
+      : "#3fc88f";
+
+  const contentStyle = useMemo(
+    () => ({
+      flex: 1,
+      overflowY: "auto" as const,
+      display: "flex",
+      flexDirection: "column" as const,
+      gap: 12,
+      paddingBottom: 96,
+    }),
+    [],
+  );
+
+  const footerStyle = useMemo(
+    () => ({
+      position: "fixed" as const,
+      left: 8,
+      right: 8,
+      bottom: 0,
+      background: "var(--vscode-sideBar-background, rgba(0,0,0,0.12))",
+      borderTop: "1px solid rgba(255,255,255,0.12)",
+      paddingTop: 6,
+      paddingBottom: 8,
+      zIndex: 10,
+    }),
+    [],
+  );
+
   return (
-    <div style={layout.app}>
-      <ModeToggle mode={mode} onChange={handleSetMode} />
-      {runningCommand ? (
-        <div
-          style={{ opacity: 0.8, fontSize: 12 }}
-          data-testid="running-banner"
-        >
-          Running: {runningCommand}…
+    <div style={layout.page}>
+      <div style={layout.app}>
+        <div style={contentStyle}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 12,
+                fontWeight: 700,
+                color: "rgba(231,234,238,0.95)",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 999,
+                padding: "4px 10px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: statusColor,
+                  display: "inline-block",
+                }}
+              />
+              {statusLabel}
+            </div>
+            <ModelSwitcher
+              currentProvider={currentModel.provider}
+              currentModel={currentModel.model}
+              models={modelOptions}
+              onChange={handleSwitchModel}
+            />
+          </div>
+          <ModeToggle
+            mode={mode}
+            onChange={handleSetMode}
+          />
+          {lastError ? (
+            <div
+              style={{
+                color: "var(--vscode-errorForeground)",
+                fontSize: 12,
+                border: "1px solid rgba(255,124,124,0.5)",
+                borderRadius: 8,
+                padding: "8px 10px",
+              }}
+              data-testid="error-banner"
+            >
+              {lastError}
+            </div>
+          ) : null}
+
+          {needsSetup ? (
+            <section style={layout.section} aria-label="Setup Required">
+              <div
+                style={{
+                  ...layout.card,
+                  minHeight: 140,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {mode === "gitpilot" ? (
+                  <button
+                    style={{ ...layout.primaryButton, minWidth: 180 }}
+                    onClick={handleSetupKeys}
+                    disabled={runningCommand === "setup"}
+                    type="button"
+                  >
+                    {runningCommand === "setup"
+                      ? "Setting up..."
+                      : "Manage API Keys"}
+                  </button>
+                ) : (
+                  <p style={{ margin: 0, fontSize: 12, opacity: 0.75 }}>
+                    Native Git mode is available without AI setup.
+                  </p>
+                )}
+              </div>
+            </section>
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  type="button"
+                  style={{
+                    ...layout.secondaryButton,
+                    flex: 1,
+                    background:
+                      activeTab === "commit"
+                        ? "var(--vscode-button-background)"
+                        : layout.secondaryButton.background,
+                    color:
+                      activeTab === "commit"
+                        ? "var(--vscode-button-foreground)"
+                        : layout.secondaryButton.color,
+                  }}
+                  onClick={() => setActiveTab("commit")}
+                >
+                  Commit
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    ...layout.secondaryButton,
+                    flex: 1,
+                    background:
+                      activeTab === "pr"
+                        ? "var(--vscode-button-background)"
+                        : layout.secondaryButton.background,
+                    color:
+                      activeTab === "pr"
+                        ? "var(--vscode-button-foreground)"
+                        : layout.secondaryButton.color,
+                  }}
+                  onClick={() => setActiveTab("pr")}
+                >
+                  Pull Request
+                </button>
+                {mode === "gitpilot" && repoStatus.hasOpenPR ? (
+                  <button
+                    type="button"
+                    style={{
+                      ...layout.secondaryButton,
+                      flex: 1,
+                      background:
+                        activeTab === "review"
+                          ? "var(--vscode-button-background)"
+                          : layout.secondaryButton.background,
+                      color:
+                        activeTab === "review"
+                          ? "var(--vscode-button-foreground)"
+                          : layout.secondaryButton.color,
+                    }}
+                    onClick={() => setActiveTab("review")}
+                  >
+                    Review
+                  </button>
+                ) : null}
+              </div>
+
+              {activeTab === "commit" ? (
+                <CommitPanel
+                  mode={mode}
+                  changedFiles={repoStatus.changedFiles}
+                  draft={commitDraft}
+                  running={runningCommand === "commit"}
+                  onGenerate={handleGenerateCommit}
+                  onCommit={handleCommit}
+                  onDraftChange={setCommitDraft}
+                  onOpenFileDiff={handleOpenFileDiff}
+                  onStageFile={handleStageFile}
+                  onUnstageFile={handleUnstageFile}
+                />
+              ) : null}
+
+              {activeTab === "review" &&
+              mode === "gitpilot" &&
+              repoStatus.hasOpenPR ? (
+                <ReviewPanel
+                  issues={issues}
+                  running={runningCommand === "review"}
+                  onRun={handleRunReview}
+                />
+              ) : null}
+
+              {activeTab === "pr" ? (
+                <PrPanel
+                  mode={mode}
+                  status={repoStatus}
+                  draft={prDraft}
+                  running={runningCommand === "pr"}
+                  commitRunning={runningCommand === "commit"}
+                  onGenerate={handleGeneratePr}
+                  onCreate={handleCreatePr}
+                  onDraftChange={setPrDraft}
+                />
+              ) : null}
+            </>
+          )}
         </div>
-      ) : null}
-      {lastError ? (
-        <div
-          style={{ color: "var(--vscode-errorForeground)", fontSize: 12 }}
-          data-testid="error-banner"
-        >
-          {lastError}
-        </div>
-      ) : null}
 
-      <ManageKeys
-        provider={currentModel.provider}
-        aiConfigured={aiConfigured}
-        platformConfigured={platformConfigured}
-        onManage={handleSetupKeys}
-      />
-
-      <CommitPanel
-        mode={mode}
-        draft={commitDraft}
-        running={runningCommand === "commit"}
-        onGenerate={handleGenerateCommit}
-        onCommit={handleCommit}
-        onDraftChange={setCommitDraft}
-      />
-
-      {repoStatus.hasOpenPR ? (
-        <ReviewPanel
-          issues={issues}
-          running={runningCommand === "review"}
-          onRun={handleRunReview}
-        />
-      ) : (
-        <PrPanel
-          mode={mode}
-          status={repoStatus}
-          draft={prDraft}
-          running={runningCommand === "pr"}
-          onGenerate={handleGeneratePr}
-          onCreate={handleCreatePr}
-          onDraftChange={setPrDraft}
-        />
-      )}
-
-      <ModelSwitcher
-        currentProvider={currentModel.provider}
-        currentModel={currentModel.model}
-        models={modelOptions}
-        onChange={handleSwitchModel}
-      />
+        {mode === "gitpilot" ? (
+          <div style={footerStyle}>
+            <ManageKeys
+              provider={currentModel.provider}
+              aiConfigured={aiConfigured}
+              platformConfigured={platformConfigured}
+              onManage={handleSetupKeys}
+            />
+          </div>
+        ) : (
+          <div style={footerStyle}>
+            <div
+              style={{
+                ...layout.card,
+                padding: 8,
+              }}
+            >
+              <span style={{ fontSize: 12, opacity: 0.72 }}>
+                Native Git mode active.
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

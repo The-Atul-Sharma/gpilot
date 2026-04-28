@@ -7,6 +7,7 @@ interface PrPanelProps {
   status: RepoStatus;
   draft: { title: string; description: string };
   running: boolean;
+  commitRunning: boolean;
   onGenerate: () => void;
   onCreate: (title: string, description: string) => void;
   onDraftChange: (draft: { title: string; description: string }) => void;
@@ -36,6 +37,7 @@ export function PrPanel({
   status,
   draft,
   running,
+  commitRunning,
   onGenerate,
   onCreate,
   onDraftChange,
@@ -43,7 +45,6 @@ export function PrPanel({
   if (!status.hasCommit) {
     return (
       <section style={layout.section} aria-label="Pull Request">
-        <h2 style={layout.sectionTitle}>Pull Request</h2>
         <div style={layout.card}>
           <p style={{ margin: 0, fontSize: 12, opacity: 0.8 }}>
             Make a commit before opening a PR.
@@ -62,7 +63,7 @@ export function PrPanel({
     onDraftChange({ ...draft, description: event.target.value });
   };
 
-  const canCreate = !running && draft.title.trim().length > 0;
+  const canCreate = !running && !commitRunning && draft.title.trim().length > 0;
   const generateLabel =
     mode === "gitpilot"
       ? "Generate PR title + description"
@@ -70,21 +71,31 @@ export function PrPanel({
 
   return (
     <section style={layout.section} aria-label="Pull Request">
-      <h2 style={layout.sectionTitle}>Pull Request</h2>
       <div style={layout.card}>
-        <div style={{ fontSize: 12, opacity: 0.8 }}>
-          Branch{" "}
-          <code style={layout.monospace}>{status.branch ?? "(detached)"}</code>{" "}
-          {status.isBranchPushed ? "(pushed)" : "(not pushed yet)"}
+        <div style={{ fontSize: 12, opacity: 0.9, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <code style={{ ...layout.monospace, color: "#34a8ff", fontWeight: 700 }}>
+            ⎇ {status.branch ?? "(detached)"}
+          </code>
+          <span
+            style={{
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: 6,
+              fontSize: 11,
+              padding: "1px 6px",
+              color: status.isBranchPushed ? "#96e1b9" : "rgba(231,234,238,0.66)",
+            }}
+          >
+            {status.isBranchPushed ? "pushed" : "not pushed"}
+          </span>
         </div>
         {mode === "gitpilot" ? (
           <button
-            style={layout.secondaryButton}
+            style={{ ...layout.secondaryButton, width: "100%" }}
             type="button"
             disabled={running}
             onClick={onGenerate}
           >
-            {running ? "Generating…" : generateLabel}
+            {running ? "Generating..." : `✦ ${generateLabel}`}
           </button>
         ) : (
           <p style={{ margin: 0, fontSize: 12, opacity: 0.7 }}>
@@ -106,16 +117,14 @@ export function PrPanel({
           onChange={handleDescriptionChange}
           style={textareaStyle}
         />
-        <div>
-          <button
-            style={layout.primaryButton}
-            type="button"
-            disabled={!canCreate}
-            onClick={() => onCreate(draft.title, draft.description)}
-          >
-            Create PR
-          </button>
-        </div>
+        <button
+          style={{ ...layout.primaryButton, width: "100%" }}
+          type="button"
+          disabled={!canCreate}
+          onClick={() => onCreate(draft.title, draft.description)}
+        >
+          Create PR
+        </button>
       </div>
     </section>
   );

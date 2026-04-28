@@ -20,6 +20,14 @@ export const repoStatusSchema = z.object({
   hasCommit: z.boolean(),
   isBranchPushed: z.boolean(),
   hasOpenPR: z.boolean(),
+  changedFiles: z.array(
+    z.object({
+      status: z.string().min(1),
+      path: z.string().min(1),
+      staged: z.boolean().default(false),
+      unstaged: z.boolean().default(false),
+    }),
+  ),
 });
 
 export const gitpilotModeSchema = z.enum(["gitpilot", "native"]);
@@ -104,6 +112,19 @@ export const webviewMessageSchema = z.discriminatedUnion("type", [
     description: z.string().min(1),
   }),
   z.object({ type: z.literal("runReview") }),
+  z.object({ type: z.literal("openWorkingTree") }),
+  z.object({
+    type: z.literal("openFileDiff"),
+    path: z.string().min(1),
+  }),
+  z.object({
+    type: z.literal("stageFile"),
+    path: z.string().min(1),
+  }),
+  z.object({
+    type: z.literal("unstageFile"),
+    path: z.string().min(1),
+  }),
   z.object({
     type: z.literal("setMode"),
     mode: gitpilotModeSchema,
