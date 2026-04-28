@@ -113,7 +113,7 @@ const inlineIssueSchema = z.object({
   comment: z
     .string()
     .min(1, 'issue.comment is empty. The AI must explain the problem.'),
-  suggestedFix: z.string().optional(),
+  suggestedFix: z.string().nullable().optional(),
 });
 
 const inputSchema = z.object({
@@ -237,7 +237,7 @@ function parseIssues(raw: string): InlineIssue[] {
       severity: d.severity,
       comment: d.comment,
     };
-    if (d.suggestedFix !== undefined) {
+    if (typeof d.suggestedFix === 'string') {
       issue.suggestedFix = d.suggestedFix;
     }
     return issue;

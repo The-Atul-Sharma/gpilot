@@ -183,6 +183,12 @@ function mapGitHubError(
     return new GitHubError(`${target} not found in ${where}`, 404);
   }
   if (status === 422) {
+    if (context.prId) {
+      return new GitHubError(
+        `GitHub rejected the inline review comment: ${detail}. This usually means the file/line is outdated for the current PR diff. Refresh review results and retry.`,
+        422,
+      );
+    }
     return new GitHubError(
       'PR already exists for this branch. Push a new commit and re-run, or close the existing PR before retrying.',
       422,
