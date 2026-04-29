@@ -1,25 +1,16 @@
 ai:
-  provider: claude
-  model: claude-sonnet-4-6
-  fallback: ollama
-
+  provider: ollama
+  model: deepseek-coder:6.7b
 platform:
   type: github
   owner: the-atul-sharma
-  repo: gitflow
-  
-  #type: azure-devops
-  #org = mycompany
-  #project = myproject
-  #repositoryId = myrepo
-
+  repo: gitpilot
 mode:
   commit: interactive
   pr_create: interactive
   pr_description: auto
   pr_review: auto
   comment_fix: interactive
-
 review:
   rules:
     - id: no-console-logs
@@ -34,6 +25,5 @@ review:
     - id: tests-required
       description: New exported functions must have tests
       severity: info
-
 conventions:
   commit_style: conventional-commits

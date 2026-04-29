@@ -1,16 +1,16 @@
-import { z } from 'zod';
-import chalk from 'chalk';
-import { readFile, writeFile } from 'node:fs/promises';
-import type { AIProvider } from '../../core/ai/index.ts';
-import type { GitClient } from '../../core/git/index.ts';
+import { z } from "zod";
+import chalk from "chalk";
+import { readFile, writeFile } from "node:fs/promises";
+import type { AIProvider } from "../../core/ai/index.ts";
+import type { GitClient } from "../../core/git/index.ts";
 import type {
   Confirmation,
   ConfirmMode,
   ConfirmResult,
-} from '../../core/confirmation/index.ts';
-import type { GitPlatform as PrReviewerGitPlatform } from '../prReviewer/index.ts';
+} from "../../core/confirmation/index.ts";
+import type { GitPlatform as PrReviewerGitPlatform } from "../prReviewer/index.ts";
 
-export type CommentSeverity = 'blocker' | 'warning' | 'info';
+export type CommentSeverity = "blocker" | "warning" | "info";
 
 export interface PRComment {
   id: string;
@@ -42,7 +42,7 @@ export interface CommentFixerInput {
 }
 
 export interface CommentFixerResult {
-  status: 'fixed' | 'skipped' | 'cancelled' | 'dryrun';
+  status: "fixed" | "skipped" | "cancelled" | "dryrun";
   fixedComments: string[];
   skippedComments: string[];
 }
@@ -50,7 +50,7 @@ export interface CommentFixerResult {
 export class CommentFixerError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'CommentFixerError';
+    this.name = "CommentFixerError";
   }
 }
 
@@ -60,36 +60,36 @@ const inputSchema = z.object({
   ai: z.custom<AIProvider>(
     (v) =>
       v !== null &&
-      typeof v === 'object' &&
-      typeof (v as AIProvider).complete === 'function',
-    'ai must be an AIProvider. Build one with createAIProvider() from core/ai.',
+      typeof v === "object" &&
+      typeof (v as AIProvider).complete === "function",
+    "ai must be an AIProvider. Build one with createAIProvider() from core/ai.",
   ),
   git: z.custom<CommentFixerGitClient>(
     (v) =>
       v !== null &&
-      typeof v === 'object' &&
-      typeof (v as CommentFixerGitClient).getCurrentBranch === 'function' &&
-      typeof (v as CommentFixerGitClient).commit === 'function' &&
-      typeof (v as CommentFixerGitClient).stage === 'function' &&
-      typeof (v as CommentFixerGitClient).push === 'function',
-    'git must be a GitClient that supports stage(files) and push(branch). Build one with createGitClient() from core/git and extend it with stage/push.',
+      typeof v === "object" &&
+      typeof (v as CommentFixerGitClient).getCurrentBranch === "function" &&
+      typeof (v as CommentFixerGitClient).commit === "function" &&
+      typeof (v as CommentFixerGitClient).stage === "function" &&
+      typeof (v as CommentFixerGitClient).push === "function",
+    "git must be a GitClient that supports stage(files) and push(branch). Build one with createGitClient() from core/git and extend it with stage/push.",
   ),
   platform: z.custom<GitPlatform>(
     (v) =>
       v !== null &&
-      typeof v === 'object' &&
-      typeof (v as GitPlatform).getPRComments === 'function' &&
-      typeof (v as GitPlatform).resolveComment === 'function',
-    'platform must be a GitPlatform with getPRComments() and resolveComment(). Build one with createGithubPlatform() or createAzureDevopsPlatform().',
+      typeof v === "object" &&
+      typeof (v as GitPlatform).getPRComments === "function" &&
+      typeof (v as GitPlatform).resolveComment === "function",
+    "platform must be a GitPlatform with getPRComments() and resolveComment(). Build one with createGithubPlatform() or createAzureDevopsPlatform().",
   ),
   confirmation: z.custom<Confirmation>(
     (v) =>
       v !== null &&
-      typeof v === 'object' &&
-      typeof (v as Confirmation).ask === 'function',
-    'confirmation must be a Confirmation. Build one with createConfirmation() from core/confirmation.',
+      typeof v === "object" &&
+      typeof (v as Confirmation).ask === "function",
+    "confirmation must be a Confirmation. Build one with createConfirmation() from core/confirmation.",
   ),
-  mode: z.enum(['interactive', 'auto', 'dryrun'], {
+  mode: z.enum(["interactive", "auto", "dryrun"], {
     message:
       'mode must be one of "interactive", "auto", or "dryrun". Pass mode from the CLI flag (--auto / --dry-run).',
   }),
@@ -97,13 +97,13 @@ const inputSchema = z.object({
     .string()
     .min(
       1,
-      'prId is empty. Pass a non-empty PR id matching the pull request you want to fix.',
+      "prId is empty. Pass a non-empty PR id matching the pull request you want to fix.",
     ),
   commentId: z
     .string()
     .min(
       1,
-      'commentId is empty. Omit to fix all unresolved blockers, or pass a non-empty comment id.',
+      "commentId is empty. Omit to fix all unresolved blockers, or pass a non-empty comment id.",
     )
     .optional(),
 });
@@ -118,10 +118,10 @@ function buildPrompt(
   fileContent: string,
   comment: PRComment,
 ): string {
-  const severity = comment.severity ?? 'info';
+  const severity = comment.severity ?? "info";
   const fixHint = comment.suggestedFix
     ? `\nSuggested fix from reviewer:\n${comment.suggestedFix}\n`
-    : '';
+    : "";
   return (
     `You are a senior engineer fixing a pull request review comment.\n\n` +
     `Apply the requested change to the file below and output the COMPLETE updated file content.\n` +
@@ -137,8 +137,10 @@ function buildPrompt(
 }
 
 function stripCodeFence(raw: string): string {
-  let text = raw.replace(/^﻿/, '');
-  const fenceMatch = text.match(/^\s*```[a-zA-Z0-9_-]*\r?\n([\s\S]*?)\r?\n```\s*$/);
+  let text = raw.replace(/^﻿/, "");
+  const fenceMatch = text.match(
+    /^\s*```[a-zA-Z0-9_-]*\r?\n([\s\S]*?)\r?\n```\s*$/,
+  );
   if (fenceMatch && fenceMatch[1] !== undefined) {
     return fenceMatch[1];
   }
@@ -169,8 +171,8 @@ function lcsTable(a: string[], b: string[]): number[][] {
 }
 
 function unifiedDiff(oldContent: string, newContent: string): string {
-  const oldLines = oldContent.split('\n');
-  const newLines = newContent.split('\n');
+  const oldLines = oldContent.split("\n");
+  const newLines = newContent.split("\n");
   const dp = lcsTable(oldLines, newLines);
   const ops: string[] = [];
   let i = oldLines.length;
@@ -200,7 +202,7 @@ function unifiedDiff(oldContent: string, newContent: string): string {
     ops.push(chalk.green(`+ ${newLines[j - 1]}`));
     j--;
   }
-  return ops.reverse().join('\n');
+  return ops.reverse().join("\n");
 }
 
 function previewFor(comment: PRComment, diff: string): string {
@@ -211,7 +213,7 @@ function previewFor(comment: PRComment, diff: string): string {
 
 async function readFileContent(filePath: string): Promise<string> {
   try {
-    return await readFile(filePath, 'utf8');
+    return await readFile(filePath, "utf8");
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     throw new CommentFixerError(
@@ -225,7 +227,7 @@ async function writeFileContent(
   content: string,
 ): Promise<void> {
   try {
-    await writeFile(filePath, content, 'utf8');
+    await writeFile(filePath, content, "utf8");
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     throw new CommentFixerError(
@@ -248,13 +250,13 @@ async function generateFix(
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     throw new CommentFixerError(
-      `AI failed to generate a fix for comment ${comment.id}: ${reason}. Re-run, or switch providers/models in gitflow.config.yml.`,
+      `AI failed to generate a fix for comment ${comment.id}: ${reason}. Re-run, or switch providers/models in gitpilot.config.yml.`,
     );
   }
   const cleaned = stripCodeFence(raw).trimEnd();
   if (!cleaned.trim()) {
     throw new CommentFixerError(
-      `AI returned empty content for comment ${comment.id}. Re-run, or switch providers/models in gitflow.config.yml.`,
+      `AI returned empty content for comment ${comment.id}. Re-run, or switch providers/models in gitpilot.config.yml.`,
     );
   }
   return cleaned;
@@ -274,35 +276,33 @@ async function decideFix(
   confirmation: Confirmation,
   mode: ConfirmMode,
 ): Promise<
-  | { kind: 'apply'; content: string }
-  | { kind: 'skip' }
-  | { kind: 'dryrun' }
+  { kind: "apply"; content: string } | { kind: "skip" } | { kind: "dryrun" }
 > {
   const diff = unifiedDiff(oldContent, newContent);
   const preview = previewFor(comment, diff);
 
-  if (mode === 'dryrun') {
+  if (mode === "dryrun") {
     await confirmation.ask({ mode, preview });
-    return { kind: 'dryrun' };
+    return { kind: "dryrun" };
   }
 
   const result: ConfirmResult = await confirmation.ask({
     mode,
     preview,
-    actions: ['yes', 'no', 'edit'],
+    actions: ["yes", "no", "edit"],
   });
 
-  if (result.action === 'yes') {
-    return { kind: 'apply', content: newContent };
+  if (result.action === "yes") {
+    return { kind: "apply", content: newContent };
   }
-  if (result.action === 'edit') {
+  if (result.action === "edit") {
     const edited = result.editedText.trimEnd();
     if (!edited.trim()) {
-      return { kind: 'skip' };
+      return { kind: "skip" };
     }
-    return { kind: 'apply', content: edited };
+    return { kind: "apply", content: edited };
   }
-  return { kind: 'skip' };
+  return { kind: "skip" };
 }
 
 async function commitAndPush(
@@ -315,7 +315,7 @@ async function commitAndPush(
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     throw new CommentFixerError(
-      `Failed to stage ${files.join(', ')}: ${reason}. Verify the files exist and the working tree is not locked.`,
+      `Failed to stage ${files.join(", ")}: ${reason}. Verify the files exist and the working tree is not locked.`,
     );
   }
   try {
@@ -337,7 +337,7 @@ async function commitAndPush(
   }
   if (!branch) {
     throw new CommentFixerError(
-      'Cannot push from detached HEAD. Switch to the PR branch with git switch <branch> and re-run.',
+      "Cannot push from detached HEAD. Switch to the PR branch with git switch <branch> and re-run.",
     );
   }
   try {
@@ -384,7 +384,7 @@ async function fetchComment(
   const match = comments.find((c) => c.id === commentId);
   if (!match) {
     throw new CommentFixerError(
-      `Comment ${commentId} not found in PR ${prId}. Re-run gitflow review to refresh comment ids, or pass a valid commentId.`,
+      `Comment ${commentId} not found in PR ${prId}. Re-run gitpilot review to refresh comment ids, or pass a valid commentId.`,
     );
   }
   return match;
@@ -403,7 +403,7 @@ async function fetchBlockers(
       `Failed to fetch comments for PR ${prId}: ${reason}. Verify your platform credentials and that PR "${prId}" exists.`,
     );
   }
-  return comments.filter((c) => c.severity === 'blocker');
+  return comments.filter((c) => c.severity === "blocker");
 }
 
 /**
@@ -450,7 +450,7 @@ export function createCommentFixer(input: CommentFixerInput): {
         : await fetchBlockers(platform, prId);
 
       if (targets.length === 0) {
-        return { status: 'fixed', fixedComments: [], skippedComments: [] };
+        return { status: "fixed", fixedComments: [], skippedComments: [] };
       }
 
       const pending: PendingFix[] = [];
@@ -480,11 +480,11 @@ export function createCommentFixer(input: CommentFixerInput): {
           mode,
         );
 
-        if (decision.kind === 'dryrun') {
+        if (decision.kind === "dryrun") {
           sawDryrun = true;
           continue;
         }
-        if (decision.kind === 'skip') {
+        if (decision.kind === "skip") {
           skipped.push(comment.id);
           continue;
         }
@@ -497,7 +497,7 @@ export function createCommentFixer(input: CommentFixerInput): {
 
       if (sawDryrun) {
         return {
-          status: 'dryrun',
+          status: "dryrun",
           fixedComments: [],
           skippedComments: skipped,
         };
@@ -505,7 +505,7 @@ export function createCommentFixer(input: CommentFixerInput): {
 
       if (pending.length === 0) {
         return {
-          status: 'skipped',
+          status: "skipped",
           fixedComments: [],
           skippedComments: skipped,
         };
@@ -520,13 +520,13 @@ export function createCommentFixer(input: CommentFixerInput): {
       const message =
         pending.length === 1
           ? `fix: address review comment ${ids[0]}`
-          : `fix: address ${pending.length} review comments (${ids.join(', ')})`;
+          : `fix: address ${pending.length} review comments (${ids.join(", ")})`;
 
       await commitAndPush(git, files, message);
       await resolveComments(platform, prId, ids);
 
       return {
-        status: 'fixed',
+        status: "fixed",
         fixedComments: ids,
         skippedComments: skipped,
       };

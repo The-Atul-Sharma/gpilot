@@ -1,11 +1,14 @@
-import { z } from 'zod';
-import { Octokit } from '@octokit/rest';
-import type { CreatePRInput, CreatedPR } from '../../modules/prCreator/index.ts';
-import type { InlineIssue } from '../../modules/prReviewer/index.ts';
+import { z } from "zod";
+import { Octokit } from "@octokit/rest";
+import type {
+  CreatePRInput,
+  CreatedPR,
+} from "../../modules/prCreator/index.ts";
+import type { InlineIssue } from "../../modules/prReviewer/index.ts";
 import type {
   PRComment,
   CommentSeverity,
-} from '../../modules/commentFixer/index.ts';
+} from "../../modules/commentFixer/index.ts";
 
 export interface GitHubConfig {
   owner: string;
@@ -27,7 +30,7 @@ export class GitHubError extends Error {
 
   constructor(message: string, status?: number) {
     super(message);
-    this.name = 'GitHubError';
+    this.name = "GitHubError";
     if (status !== undefined) this.status = status;
   }
 }
@@ -51,7 +54,7 @@ const configSchema = z.object({
     .string()
     .min(
       1,
-      'GitHub token is empty. Run: npx gitflow auth and store GITHUB_TOKEN.',
+      "GitHub token is empty. Run: npx gitpilot auth and store GITHUB_TOKEN.",
     ),
 });
 
@@ -66,13 +69,13 @@ const commentIdSchema = z
   .string()
   .min(
     1,
-    'commentId is empty. Pass the numeric GitHub review comment id as a string.',
+    "commentId is empty. Pass the numeric GitHub review comment id as a string.",
   );
 
 const createPRInputSchema = z.object({
   title: z
     .string()
-    .min(1, 'createPR title is empty. Pass a non-empty PR title.'),
+    .min(1, "createPR title is empty. Pass a non-empty PR title."),
   body: z.string(),
   sourceBranch: z
     .string()
@@ -97,14 +100,14 @@ const inlineIssueSchema = z.object({
     ),
   line: z
     .number()
-    .int('issue.line must be an integer line number.')
-    .positive('issue.line must be > 0. Pass a 1-based line number.'),
-  severity: z.enum(['blocker', 'warning', 'info'], {
+    .int("issue.line must be an integer line number.")
+    .positive("issue.line must be > 0. Pass a 1-based line number."),
+  severity: z.enum(["blocker", "warning", "info"], {
     message: 'issue.severity must be one of "blocker", "warning", "info".',
   }),
   comment: z
     .string()
-    .min(1, 'issue.comment is empty. Pass a non-empty review comment body.'),
+    .min(1, "issue.comment is empty. Pass a non-empty review comment body."),
   suggestedFix: z.string().optional(),
 });
 
@@ -115,7 +118,7 @@ interface OctokitErrorLike {
 }
 
 function isOctokitError(err: unknown): err is OctokitErrorLike {
-  return typeof err === 'object' && err !== null && 'status' in err;
+  return typeof err === "object" && err !== null && "status" in err;
 }
 
 function errorDetail(err: unknown): string {
@@ -152,9 +155,9 @@ function parseSeverity(body: string): CommentSeverity | undefined {
   const match = body.match(/^\[(BLOCKER|WARNING|INFO)\]/);
   if (!match) return undefined;
   const tag = match[1];
-  if (tag === 'BLOCKER') return 'blocker';
-  if (tag === 'WARNING') return 'warning';
-  return 'info';
+  if (tag === "BLOCKER") return "blocker";
+  if (tag === "WARNING") return "warning";
+  return "info";
 }
 
 function mapGitHubError(
@@ -167,19 +170,19 @@ function mapGitHubError(
 
   if (status === 401) {
     return new GitHubError(
-      'GitHub token invalid or expired. Run: npx gitflow auth',
+      "GitHub token invalid or expired. Run: npx gitpilot auth",
       401,
     );
   }
   if (status === 403) {
     return new GitHubError(
-      'GitHub token lacks required permissions. Needs: repo, pull_requests',
+      "GitHub token lacks required permissions. Needs: repo, pull_requests",
       403,
     );
   }
   if (status === 404) {
     const where = `${context.owner}/${context.repo}`;
-    const target = context.prId ? `PR #${context.prId}` : 'resource';
+    const target = context.prId ? `PR #${context.prId}` : "resource";
     return new GitHubError(`${target} not found in ${where}`, 404);
   }
   if (status === 422) {
@@ -190,7 +193,7 @@ function mapGitHubError(
       );
     }
     return new GitHubError(
-      'PR already exists for this branch. Push a new commit and re-run, or close the existing PR before retrying.',
+      "PR already exists for this branch. Push a new commit and re-run, or close the existing PR before retrying.",
       422,
     );
   }
@@ -272,7 +275,7 @@ export function parseGitHubRemote(remoteUrl: string): {
  * is never logged.
  */
 export class GitHubPlatform implements GitPlatform {
-  readonly name = 'GitHub';
+  readonly name = "GitHub";
   readonly #owner: string;
   readonly #repo: string;
   readonly #octokit: Octokit;
@@ -334,7 +337,7 @@ export class GitHubPlatform implements GitPlatform {
           owner: this.#owner,
           repo: this.#repo,
           pull_number,
-          mediaType: { format: 'diff' },
+          mediaType: { format: "diff" },
         });
         return response.data as unknown as string;
       },
@@ -377,7 +380,7 @@ export class GitHubPlatform implements GitPlatform {
           commit_id,
           path: validatedIssue.file,
           line: validatedIssue.line,
-          side: 'RIGHT',
+          side: "RIGHT",
           body,
         });
       },
@@ -444,7 +447,7 @@ export class GitHubPlatform implements GitPlatform {
           repo: this.#repo,
           pull_number,
           comment_id,
-          body: '✓ Fixed',
+          body: "✓ Fixed",
         });
       },
     );

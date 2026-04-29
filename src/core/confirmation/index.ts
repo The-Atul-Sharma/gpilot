@@ -1,14 +1,14 @@
-import { z } from 'zod';
-import chalk from 'chalk';
-import { spawn } from 'node:child_process';
-import { promises as fs } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { z } from "zod";
+import chalk from "chalk";
+import { spawn } from "node:child_process";
+import { promises as fs } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomBytes } from "node:crypto";
 
-export type ConfirmMode = 'interactive' | 'auto' | 'dryrun';
+export type ConfirmMode = "interactive" | "auto" | "dryrun";
 
-export type ConfirmAction = 'yes' | 'no' | 'edit' | 'regenerate';
+export type ConfirmAction = "yes" | "no" | "edit" | "regenerate";
 
 export interface ConfirmOptions {
   mode: ConfirmMode;
@@ -17,10 +17,10 @@ export interface ConfirmOptions {
 }
 
 export type ConfirmResult =
-  | { action: 'yes' }
-  | { action: 'no' }
-  | { action: 'edit'; editedText: string }
-  | { action: 'regenerate' };
+  | { action: "yes" }
+  | { action: "no" }
+  | { action: "edit"; editedText: string }
+  | { action: "regenerate" };
 
 export interface Confirmation {
   ask(options: ConfirmOptions): Promise<ConfirmResult>;
@@ -29,12 +29,12 @@ export interface Confirmation {
 export class ConfirmationError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'ConfirmationError';
+    this.name = "ConfirmationError";
   }
 }
 
-const confirmActionSchema = z.enum(['yes', 'no', 'edit', 'regenerate']);
-const confirmModeSchema = z.enum(['interactive', 'auto', 'dryrun']);
+const confirmActionSchema = z.enum(["yes", "no", "edit", "regenerate"]);
+const confirmModeSchema = z.enum(["interactive", "auto", "dryrun"]);
 
 const confirmOptionsSchema = z.object({
   mode: confirmModeSchema,
@@ -43,23 +43,23 @@ const confirmOptionsSchema = z.object({
 });
 
 const ACTION_SHORTCUTS: Record<ConfirmAction, string> = {
-  yes: 'y',
-  no: 'n',
-  edit: 'e',
-  regenerate: 'r',
+  yes: "y",
+  no: "n",
+  edit: "e",
+  regenerate: "r",
 };
 
 const ACTION_LABELS: Record<ConfirmAction, string> = {
-  yes: 'yes',
-  no: 'cancel',
-  edit: 'edit',
-  regenerate: 'regenerate',
+  yes: "yes",
+  no: "cancel",
+  edit: "edit",
+  regenerate: "regenerate",
 };
 
 function formatHints(actions: ConfirmAction[]): string {
   return actions
     .map((a) => `[${ACTION_SHORTCUTS[a]}] ${ACTION_LABELS[a]}`)
-    .join('  ');
+    .join("  ");
 }
 
 interface EnquirerLike {
@@ -72,10 +72,10 @@ async function loadEnquirer(): Promise<EnquirerLike | null> {
   if (enquirerPromise) return enquirerPromise;
   enquirerPromise = (async () => {
     try {
-      const mod = (await import('enquirer')) as
+      const mod = (await import("enquirer")) as
         | EnquirerLike
         | { default: EnquirerLike };
-      return 'default' in mod && mod.default
+      return "default" in mod && mod.default
         ? mod.default
         : (mod as EnquirerLike);
     } catch {
@@ -88,43 +88,43 @@ async function loadEnquirer(): Promise<EnquirerLike | null> {
 async function readlinePrompt(
   actions: ConfirmAction[],
 ): Promise<ConfirmAction> {
-  const readline = await import('node:readline');
+  const readline = await import("node:readline");
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
   });
-  const question = `${chalk.cyan('Choose an action')} ${chalk.dim(formatHints(actions))}: `;
+  const question = `${chalk.cyan("Choose an action")} ${chalk.dim(formatHints(actions))}: `;
   return new Promise((resolve) => {
-    rl.on('close', () => resolve('no'));
+    rl.on("close", () => resolve("no"));
     rl.question(question, (answer) => {
       rl.close();
       const trimmed = answer.trim().toLowerCase();
       const match = actions.find(
         (a) => ACTION_SHORTCUTS[a] === trimmed || a === trimmed,
       );
-      resolve(match ?? 'no');
+      resolve(match ?? "no");
     });
   });
 }
 
 async function openEditor(initialContent: string): Promise<string> {
-  const editor = process.env['EDITOR'] ?? 'vim';
+  const editor = process.env["EDITOR"] ?? "vim";
   const tmpPath = join(
     tmpdir(),
-    `gitflow-${randomBytes(8).toString('hex')}.txt`,
+    `gitpilot-${randomBytes(8).toString("hex")}.txt`,
   );
-  await fs.writeFile(tmpPath, initialContent, 'utf8');
+  await fs.writeFile(tmpPath, initialContent, "utf8");
   try {
     await new Promise<void>((resolve, reject) => {
-      const child = spawn(editor, [tmpPath], { stdio: 'inherit' });
-      child.on('error', (err) => {
+      const child = spawn(editor, [tmpPath], { stdio: "inherit" });
+      child.on("error", (err) => {
         reject(
           new ConfirmationError(
             `Failed to launch editor "${editor}": ${err.message}. Set the $EDITOR environment variable to a valid editor command, e.g. export EDITOR=nano`,
           ),
         );
       });
-      child.on('exit', (code) => {
+      child.on("exit", (code) => {
         if (code === 0) {
           resolve();
         } else {
@@ -136,7 +136,7 @@ async function openEditor(initialContent: string): Promise<string> {
         }
       });
     });
-    return await fs.readFile(tmpPath, 'utf8');
+    return await fs.readFile(tmpPath, "utf8");
   } finally {
     await fs.unlink(tmpPath).catch(() => undefined);
   }
@@ -151,23 +151,25 @@ async function promptForAction(
   }
   try {
     const response = await enquirer.prompt({
-      type: 'select',
-      name: 'action',
-      message: chalk.cyan(`Choose an action ${chalk.dim(formatHints(actions))}`),
+      type: "select",
+      name: "action",
+      message: chalk.cyan(
+        `Choose an action ${chalk.dim(formatHints(actions))}`,
+      ),
       choices: actions.map((a) => ({
         name: a,
         message: `${ACTION_LABELS[a]} (${ACTION_SHORTCUTS[a]})`,
         value: a,
       })),
     });
-    const chosen = response['action'];
-    if (typeof chosen === 'string') {
+    const chosen = response["action"];
+    if (typeof chosen === "string") {
       const match = actions.find((a) => a === chosen);
       if (match) return match;
     }
-    return 'no';
+    return "no";
   } catch {
-    return 'no';
+    return "no";
   }
 }
 
@@ -191,31 +193,31 @@ export function createConfirmation(): Confirmation {
   return {
     async ask(options) {
       const validated = confirmOptionsSchema.parse(options);
-      const actions = validated.actions ?? ['yes', 'no'];
+      const actions = validated.actions ?? ["yes", "no"];
 
-      if (validated.mode === 'auto') {
-        return { action: 'yes' };
+      if (validated.mode === "auto") {
+        return { action: "yes" };
       }
 
-      if (validated.mode === 'dryrun') {
+      if (validated.mode === "dryrun") {
         process.stdout.write(`${chalk.white(validated.preview)}\n`);
-        return { action: 'no' };
+        return { action: "no" };
       }
 
       process.stdout.write(`${chalk.white(validated.preview)}\n`);
 
       const chosen = await promptForAction(actions);
 
-      if (chosen === 'edit') {
+      if (chosen === "edit") {
         const editedText = await openEditor(validated.preview);
-        return { action: 'edit', editedText };
+        return { action: "edit", editedText };
       }
 
-      if (chosen === 'yes' || chosen === 'regenerate') {
+      if (chosen === "yes" || chosen === "regenerate") {
         return { action: chosen };
       }
 
-      return { action: 'no' };
+      return { action: "no" };
     },
   };
 }
