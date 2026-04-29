@@ -180,7 +180,50 @@ function cleanMessage(raw: string): string {
   ) {
     text = text.slice(1, -1).trim();
   }
+  // Strip conversational prefaces small/local models often add even when told
+  // not to: "Here's the commit message:\n…", "Sure! Here is:\n…", etc.
+  const prefacePatterns = [
+    /^(?:sure[,!.]?\s*)?here(?:'s|\s+is)\s+(?:the\s+)?(?:commit\s+message|commit|message)[:\s-]*\n+/i,
+    /^commit\s+message[:\s-]*\n+/i,
+    /^message[:\s-]*\n+/i,
+  ];
+  for (const pattern of prefacePatterns) {
+    text = text.replace(pattern, "").trim();
+  }
   return text;
+}
+
+function lowercaseType(message: string): string {
+  const [header = "", ...rest] = message.split("\n");
+  const lowered = header.replace(
+    /^([A-Z][a-z]+)(\([^)]+\))?(!?:\s+)/,
+    (_, type: string, scope: string | undefined, sep: string) =>
+      `${type.toLowerCase()}${scope ?? ""}${sep}`,
+  );
+  return [lowered, ...rest].join("\n");
+}
+
+function ensureConventionalPrefix(message: string): string {
+  const [header = "", ...rest] = message.split("\n");
+  if (HEADER_PATTERN.test(header.trim())) return message;
+  // No recognized type prefix — infer one from the subject text.
+  const subject = header.trim();
+  if (!subject) return message;
+  const inferred = inferType(subject);
+  return [`${inferred}: ${subject}`, ...rest].join("\n");
+}
+
+function inferType(subject: string): (typeof CONVENTIONAL_TYPES)[number] {
+  const lower = subject.toLowerCase();
+  if (/(^|\s)(fix|bug|patch|resolve)(\s|$)/.test(lower)) return "fix";
+  if (/(^|\s)(doc|docs|readme|comment)/.test(lower)) return "docs";
+  if (/(^|\s)(test|spec)/.test(lower)) return "test";
+  if (/(^|\s)(refactor|rename|move|extract|inline|cleanup)/.test(lower)) return "refactor";
+  if (/(^|\s)(perf|optimi[sz]e|speed)/.test(lower)) return "perf";
+  if (/(^|\s)(build|ci|deploy|release|version|bump)/.test(lower))
+    return lower.includes("ci") ? "ci" : "build";
+  if (/(^|\s)(chore|update|upgrade)/.test(lower)) return "chore";
+  return "feat";
 }
 
 function normalizeHeader(header: string): string {
@@ -308,7 +351,9 @@ export function createCommitGenerator(input: CommitGeneratorInput): {
         const raw = await ai.complete(prompt, { temperature: 0.2 });
         const message = truncateHeaderToMaxLength(
           enforceScopePolicy(
-            normalizeMessage(cleanMessage(raw)),
+            normalizeMessage(
+              ensureConventionalPrefix(lowercaseType(cleanMessage(raw))),
+            ),
             requiredScope,
           ),
         );

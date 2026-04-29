@@ -109,16 +109,19 @@ function buildPrompt(
     : "";
   return (
     `You are a senior engineer writing a pull request description.\n\n` +
-    `Output a single JSON object with exactly two string fields: "title" and "body". ` +
+    `Output a single JSON object with EXACTLY these two string fields: "title" and "body". ` +
+    `Both fields are MANDATORY. Do not omit either. Do not nest them under any other key. ` +
     `No code fences, no preface, no commentary outside the JSON.\n\n` +
     `Rules:\n` +
     `- "title": imperative mood, <= ${TITLE_MAX_LENGTH} chars, no trailing period, no PR number prefix.\n` +
-    `- "body": GitHub-flavored markdown that follows the template below exactly. Replace each placeholder with real content based on the diff. Drop any section that has no content rather than leaving placeholders.\n\n` +
-    `Template:\n${template}\n\n` +
+    `- "body": GitHub-flavored markdown that follows the template below. Replace each placeholder with real content based on the diff. Drop any section that has no content rather than leaving placeholders.\n\n` +
+    `Example of the EXACT shape you must return:\n` +
+    `{"title":"feat(auth): add OAuth2 token refresh","body":"## Summary\\nAdds automatic token refresh.\\n\\n## Changes\\n- Refresh on 401 with backoff"}\n\n` +
+    `Template for the body:\n${template}\n\n` +
     recentBlock +
     `Files changed:\n${formatFiles(files)}\n\n` +
     `Diff:\n${truncateDiff(diff)}\n\n` +
-    `Return ONLY the JSON object.`
+    `Return ONLY the JSON object — nothing else, no markdown fences.`
   );
 }
 
@@ -133,48 +136,161 @@ function stripCodeFence(raw: string): string {
   return text;
 }
 
-function extractJsonObject(text: string): string {
+function extractJsonObject(text: string): string | null {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) {
-    throw new PrDescriptionError(
-      "AI did not return a JSON object. Choose regenerate, or switch providers/models in gitpilot.config.yml.",
-    );
-  }
+  if (start === -1 || end === -1 || end <= start) return null;
   return text.slice(start, end + 1);
 }
 
-const outputSchema = z.object({
-  title: z
-    .string()
-    .min(1, "title is empty")
-    .max(TITLE_MAX_LENGTH, `title exceeds ${TITLE_MAX_LENGTH} chars`),
-  body: z.string().min(1, "body is empty"),
-});
+const TITLE_KEYS = ["title", "pr_title", "prTitle", "name", "summary", "subject"] as const;
+const BODY_KEYS = [
+  "body",
+  "description",
+  "pr_body",
+  "prBody",
+  "content",
+  "details",
+  "response", // Ollama / OpenAI-compat wrappers often nest the real answer here
+  "text",
+  "message",
+] as const;
 
-function parseOutput(raw: string): { title: string; body: string } {
-  const cleaned = stripCodeFence(raw);
-  const json = extractJsonObject(cleaned);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(json);
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    throw new PrDescriptionError(
-      `AI output was not valid JSON (${reason}). Choose regenerate, or use edit to write the description manually.`,
-    );
+// Short throwaway phrases small models return instead of doing the work.
+// If we see one of these as the only payload, we treat the response as
+// useless and ask the user to regenerate rather than committing it as content.
+const ACKNOWLEDGMENT_VALUES = new Set([
+  "success",
+  "ok",
+  "okay",
+  "done",
+  "complete",
+  "completed",
+  "yes",
+  "true",
+]);
+
+function looksLikeAcknowledgment(value: string): boolean {
+  const stripped = value.trim().toLowerCase().replace(/[.!]+$/, "");
+  return stripped.length <= 12 && ACKNOWLEDGMENT_VALUES.has(stripped);
+}
+
+function pickStringField(obj: Record<string, unknown>, keys: ReadonlyArray<string>): string {
+  for (const key of keys) {
+    const value = obj[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
   }
-  const result = outputSchema.safeParse(parsed);
-  if (!result.success) {
-    const issue = result.error.issues[0]?.message ?? "invalid structure";
-    throw new PrDescriptionError(
-      `AI output failed validation: ${issue}. Choose regenerate, or use edit to write the description manually.`,
-    );
+  return "";
+}
+
+function deriveTitleFromBody(body: string, recentMessages: string[]): string {
+  // Prefer the first markdown heading, then the first non-empty line, then
+  // the first recent commit's first line as a last resort.
+  for (const line of body.split("\n")) {
+    const heading = line.match(/^#{1,6}\s+(.+?)\s*$/);
+    if (heading?.[1]) return heading[1].slice(0, TITLE_MAX_LENGTH);
   }
+  const firstLine = body.split("\n").find((l) => l.trim().length > 0);
+  if (firstLine) return firstLine.trim().slice(0, TITLE_MAX_LENGTH);
+  const firstCommit = recentMessages[0]?.split("\n")[0]?.trim();
+  if (firstCommit) return firstCommit.slice(0, TITLE_MAX_LENGTH);
+  return "";
+}
+
+function parseFreeformMarkdown(text: string): { title: string; body: string } | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const lines = trimmed.split("\n");
+  // First non-empty line becomes the title (stripping leading `#` markers).
+  const firstIdx = lines.findIndex((l) => l.trim().length > 0);
+  if (firstIdx === -1) return null;
+  const titleLine = lines[firstIdx]!.replace(/^#{1,6}\s*/, "").trim();
+  if (!titleLine) return null;
+  const body = lines.slice(firstIdx + 1).join("\n").trim();
   return {
-    title: result.data.title.trim(),
-    body: result.data.body.trim(),
+    title: titleLine.slice(0, TITLE_MAX_LENGTH),
+    body: body || titleLine,
   };
+}
+
+function parseOutput(
+  raw: string,
+  recentMessages: string[],
+): { title: string; body: string } {
+  const cleaned = stripCodeFence(raw).trim();
+  if (!cleaned) {
+    throw new PrDescriptionError(
+      "AI returned an empty response. Choose regenerate, or use edit to write the description manually.",
+    );
+  }
+
+  // 1) Try strict JSON parse. Small local models often skip a key, use a
+  //    different key name, or wrap the JSON in prose — handle each case.
+  const json = extractJsonObject(cleaned);
+  let jsonParsedSuccessfully = false;
+  let parsedKeys: string[] = [];
+  if (json) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(json);
+      jsonParsedSuccessfully = true;
+    } catch {
+      parsed = null;
+    }
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const obj = parsed as Record<string, unknown>;
+      parsedKeys = Object.keys(obj);
+      let title = pickStringField(obj, TITLE_KEYS);
+      let body = pickStringField(obj, BODY_KEYS);
+      // Some models nest both fields under a single key like "pr" or "data".
+      if (!title || !body) {
+        for (const wrapper of ["pr", "pull_request", "data", "result"]) {
+          const inner = obj[wrapper];
+          if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+            const innerObj = inner as Record<string, unknown>;
+            if (!title) title = pickStringField(innerObj, TITLE_KEYS);
+            if (!body) body = pickStringField(innerObj, BODY_KEYS);
+          }
+        }
+      }
+      // Reject acknowledgment-only payloads like {"response":"success"} — the
+      // model didn't actually produce anything, so committing it as the body
+      // would just write garbage into the PR description.
+      if (body && looksLikeAcknowledgment(body) && !title) {
+        throw new PrDescriptionError(
+          `AI returned an acknowledgment ("${body.trim()}") instead of a PR description. ` +
+            `This usually means the model ignored the JSON schema. Choose regenerate, ` +
+            `switch to a stronger model, or use edit.`,
+        );
+      }
+      if (!title && body) title = deriveTitleFromBody(body, recentMessages);
+      if (title && !body) body = title;
+      if (title && body) {
+        if (title.length > TITLE_MAX_LENGTH) title = title.slice(0, TITLE_MAX_LENGTH);
+        return { title, body };
+      }
+    }
+  }
+
+  // 2) Freeform fallback — only when JSON parsing failed entirely. If the
+  //    model returned a JSON object that just didn't have the right keys,
+  //    falling back to "treat the literal JSON string as markdown" produces
+  //    garbage like a PR titled `{"response":"success"}`. Surface a real
+  //    error in that case so the user can regenerate.
+  if (!jsonParsedSuccessfully) {
+    const freeform = parseFreeformMarkdown(cleaned);
+    if (freeform) return freeform;
+  }
+
+  const keysHint =
+    parsedKeys.length > 0
+      ? ` (model returned keys: ${parsedKeys.map((k) => `"${k}"`).join(", ")})`
+      : "";
+  throw new PrDescriptionError(
+    `AI did not return a usable title or body${keysHint}. Choose regenerate, switch to a stronger model, or use edit to write the description manually.`,
+  );
 }
 
 function renderPreview(title: string, body: string): string {
@@ -266,7 +382,7 @@ export function createPrDescription(input: PrDescriptionInput): {
       while (true) {
         const prompt = buildPrompt(diff, files, recentMessages, template);
         const raw = await ai.complete(prompt, { temperature: 0.2 });
-        const { title, body } = parseOutput(raw);
+        const { title, body } = parseOutput(raw, recentMessages);
 
         if (mode === "dryrun") {
           await confirmation.ask({ mode, preview: renderPreview(title, body) });
