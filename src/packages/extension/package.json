@@ -2,7 +2,7 @@
   "name": "gpilot",
   "displayName": "gpilot",
   "description": "AI-powered git workflow inside VS Code: generate commits, create PRs with descriptions, and run AI code reviews — all from a task-oriented sidebar.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "atsharma",
   "license": "MIT",
   "repository": {
