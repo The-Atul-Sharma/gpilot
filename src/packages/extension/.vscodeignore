@@ -5,3 +5,14 @@ tsconfig.json
 package-lock.json
 node_modules/**/typescript/**
 node_modules/**/@types/**
+**/*.map
+**/tsconfig*.json
+**/.eslintrc*
+**/.prettierrc*
+**/.github/**
+**/test/**
+**/tests/**
+**/__tests__/**
+**/*.md
+!README.md
+!LICENSE
