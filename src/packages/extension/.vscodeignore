@@ -1,0 +1,7 @@
+.vscode/**
+src/**
+**/*.ts
+tsconfig.json
+package-lock.json
+node_modules/**/typescript/**
+node_modules/**/@types/**
